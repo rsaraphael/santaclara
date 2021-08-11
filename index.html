@@ -1,0 +1,74 @@
+<!DOCTYPE HTML>
+<!--
+	Spectral by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+
+<head>
+	<title>Convento Santa Clara</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+	<link rel="stylesheet" href="assets/css/main.css" />
+	<noscript>
+		<link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+</head>
+
+<body class="landing is-preload">
+
+	<!-- Page Wrapper -->
+	<div id="page-wrapper">
+
+		<!-- Banner -->
+		<section id="banner">
+			<div class="inner">
+				<h2>Convento Santa Clara</h2>
+				<p>Obrigado pela sua doação<br />
+					<br />
+					Pix: 60520061000535
+					<br />
+					<br />
+					Ou transferência para:
+					<br />
+					<br />
+					Província dos Capuchinhos de São Paulo
+					<br />
+					Banco: 033 Santander
+					<br />
+					Agência: 4743
+					<br />
+					Conta Corrente: 13.000098-3
+					<br />
+					CNPJ: 605200610/0005-35				
+				</p>
+				<ul class="actions special">
+					<li><a id="pixValue" onclick="copy()" value="605200610000535" class="button primary">Clique aqui para
+							copiar o número do pix</a></li>
+				</ul>
+			</div>
+		</section>
+	</div>
+
+	<!-- Scripts -->
+	<script src="assets/js/jquery.min.js"></script>
+	<script src="assets/js/jquery.scrollex.min.js"></script>
+	<script src="assets/js/jquery.scrolly.min.js"></script>
+	<script src="assets/js/browser.min.js"></script>
+	<script src="assets/js/breakpoints.min.js"></script>
+	<script src="assets/js/util.js"></script>
+	<script src="assets/js/main.js"></script>
+	<script>
+		function copy() {
+			const el = document.createElement('textarea');
+			el.value = "60520061000535";
+			document.body.appendChild(el);
+			el.select();
+			document.execCommand('copy');
+			document.body.removeChild(el);
+		}
+	</script>
+
+</body>
+
+</html>
