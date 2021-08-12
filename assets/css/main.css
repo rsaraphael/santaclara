@@ -2428,7 +2428,7 @@ input, select, textarea {
 		text-align: center;
 		text-decoration: none;
 		text-transform: uppercase;
-		white-space: nowrap;
+		/* white-space: nowrap; */
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
@@ -3996,3 +3996,24 @@ input, select, textarea {
 	body.is-mobile.landing #footer {
 		background-color: #1d242a;
 	}
+
+	.agradecimento li {
+        padding-left: 0.5em;
+        margin: 16px 0;
+        text-align: left;
+        font-size: 16px;
+    }
+
+    @media screen and (max-width: 736px) {
+        #banner {
+            padding: 4em 3em 5em 3em;
+            height: auto;
+            min-height: 0;
+        }
+    }
+
+	#pixValue {
+		height: auto;
+		overflow: inherit;
+		box-shadow: 0 1px 7px 5px rgb(0 0 0 / 12%) !important;
+	  }
