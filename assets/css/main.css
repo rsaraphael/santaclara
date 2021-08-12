@@ -161,7 +161,7 @@ input, select, textarea {
 	p {
 		margin: 0 0 1em 0;
 		font-size: 14px;
-	}
+}
 
 	h1, h2, h3, h4, h5, h6 {
 		color: #fff;
@@ -4006,7 +4006,7 @@ input, select, textarea {
 
     @media screen and (max-width: 736px) {
         #banner {
-            padding: 4em 3em 5em 3em;
+            padding: 2em 3em 5em 3em;
             height: auto;
             min-height: 0;
         }
