@@ -11,7 +11,7 @@
                 "id": 1,
                 "name": "Salgado",
                 "description": "Coxinha ou Esfirra",
-                "price": 500,
+                "price": 600,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
@@ -20,7 +20,7 @@
                 "id": 2,
                 "name": "Pastel",
                 "description": "Queijo, Pizza, Frango ou Carne",
-                "price": 500,
+                "price": 600,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
