@@ -1,0 +1,87 @@
+$space: 16px;
+$font: "Nunito", sans-serif;
+$font: "Montserrat", sans-serif;
+
+// COLORS
+$color-primary: #3FB15A;
+// $color-primary: #393f93;
+// $color-primary: #00a98f;
+// $color-primary: #ff4422;
+
+$color-black: #3e3e3e;
+$color-pink: #ff4081;
+$color-green: #3FB15A;
+$color-red: #cc4848;
+$color-bg: #faf7f0;
+$color-grey: #afb0b1;
+
+// $color-blue: #337ab7;
+// $color-blue-dark: #094879;
+// $color-blue-light: #0099ff;
+// $color-black: #333;
+
+// $color-green-light: #7ac07c;
+
+// $color-yellow: #f4a322;
+// $color-orange: #ff7700;
+// $color-orange-ligth: #ffa33a;
+// $color-grey: #95a0a1;
+// $color-bg: #f6f6f6;
+
+$boxShadow: 0 1px 4px 0px rgba(52, 40, 104, 0.08);
+// $boxShadow: 0px 2px 1px -1px rgba(0, 0, 0, 0.2), 0px 1px 1px 0px rgba(0, 0, 0, 0.14), 0px 1px 3px 0px rgba(0, 0, 0, 0.12);
+
+// Z-INDEX CONFIG
+$zIndex-buttonViewOrder: 2;
+$zIndex-DetailsProduct: 3;
+
+// RADIUS
+$borderRadius: 8px;
+
+$menu-width: 240px;
+
+$header-heigth: 54px;
+
+// MIXINS
+$breakpointsList: (
+    "phone-small": 360px,
+    "phone": 400px,
+    "phone-wide": 480px,
+    "phablet": 560px,
+    "tablet-small": 600px,
+    "tablet": 768px,
+    "tablet-wide": 1024px,
+    "desktop": 1200px,
+    "desktop-wide": 1440px,
+    "desktop-wide-md": 1600px,
+    "desktop-wide-lg": 1920px,
+);
+
+@mixin mq($width, $type: min) {
+    @if map_has_key($breakpointsList, $width) {
+        $width: map_get($breakpointsList, $width);
+        @if $type == max {
+            $width: $width - 1px;
+        }
+        @media only screen and (#{$type}-width: $width) {
+            @content;
+        }
+    }
+}
+
+@mixin borderBottom($color: #f5f0eb) {
+    &::after {
+        content: "";
+        background: $color;
+        position: absolute;
+        width: 100%;
+        height: 1px;
+        left: 0;
+        right: 0;
+        margin: auto;
+        bottom: 0;
+        width: calc(100% - 32px);
+    }
+}
+
+$widthPage: 600px;
