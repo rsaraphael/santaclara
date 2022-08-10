@@ -72,6 +72,33 @@
             },
             {
                 "id": 8,
+                "name": "Vinho Copo",
+                "description": null,
+                "price": 600,
+                "adultsOnly": false,
+                "enabled": true,
+                "additionalItemsGroups": []
+            },
+            {
+                "id": 9,
+                "name": "Vinho Quente",
+                "description": null,
+                "price": 600,
+                "adultsOnly": false,
+                "enabled": true,
+                "additionalItemsGroups": []
+            },
+            {
+                "id": 10,
+                "name": "Chocolate Quente",
+                "description": null,
+                "price": 600,
+                "adultsOnly": false,
+                "enabled": true,
+                "additionalItemsGroups": []
+            },
+            {
+                "id": 11,
                 "name": "Cachorro-quente",
                 "description": null,
                 "price": 800,
@@ -80,7 +107,7 @@
                 "additionalItemsGroups": []
             },
             {
-                "id": 9,
+                "id": 12,
                 "name": "Lanche de calabresa",
                 "description": null,
                 "price": 1200,
@@ -89,7 +116,7 @@
                 "additionalItemsGroups": []
             },
             {
-                "id": 10,
+                "id": 13,
                 "name": "Pernil",
                 "description": null,
                 "price": 1200,
@@ -98,7 +125,7 @@
                 "additionalItemsGroups": []
             },
             {
-                "id": 11,
+                "id": 14,
                 "name": "Doce Pequeno",
                 "description": null,
                 "price": 300,
@@ -107,7 +134,7 @@
                 "additionalItemsGroups": []
             },
             {
-                "id": 12,
+                "id": 15,
                 "name": "Doce Grande",
                 "description": null,
                 "price": 500,
@@ -116,7 +143,7 @@
                 "additionalItemsGroups": []
             },
             {
-                "id": 13,
+                "id": 16,
                 "name": "Bolo de Santa Clara",
                 "description": null,
                 "price": 1000,
@@ -143,96 +170,7 @@
             "name": " ",
             "order": 1,
             "enabled": true,
-            "products": [{
-                    "id": 1,
-                    "name": "Salgado",
-                    "description": "Coxinha, bolinho",
-                    "price": 500,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                },
-                {
-                    "id": 2,
-                    "name": "Churrasco",
-                    "description": "Frango ou carne",
-                    "price": 800,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                },
-                {
-                    "id": 3,
-                    "name": "Caldo",
-                    "description": "Feijão, Mandioca ou Canja",
-                    "price": 800,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                },
-                {
-                    "id": 4,
-                    "name": "Bebidas",
-                    "description": "Refrigerantes e o que mais??",
-                    "price": 500,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                },
-                {
-                    "id": 5,
-                    "name": "Água",
-                    "description": null,
-                    "price": 300,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                },
-                {
-                    "id": 6,
-                    "name": "Suco",
-                    "description": "Sabores diversos",
-                    "price": 600,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                },
-                {
-                    "id": 7,
-                    "name": "Cachorro-quente",
-                    "description": null,
-                    "price": 800,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                },
-                {
-                    "id": 8,
-                    "name": "Lanche de calabresa",
-                    "description": null,
-                    "price": 1200,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                },
-                {
-                    "id": 9,
-                    "name": "Pernil",
-                    "description": null,
-                    "price": 1200,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                },
-                {
-                    "id": 10,
-                    "name": "Bolo de Santa Clara",
-                    "description": null,
-                    "price": 1000,
-                    "adultsOnly": false,
-                    "enabled": true,
-                    "additionalItemsGroups": []
-                }
+            "products": [
             ],
             "openingHours": [],
             "paymentTypes": [],
