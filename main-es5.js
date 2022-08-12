@@ -1377,7 +1377,7 @@ function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _d
           el.select();
           document.execCommand('copy');
           document.body.removeChild(el);
-          alert("Pix Copiado!!");
+          alert("Pix Copiado!! Agora é só colar na área PIX COPIA E COLA do app seu banco!");
         }
       }, {
         key: "setValues",
@@ -1421,7 +1421,7 @@ function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _d
       selectors: [["app-checkout"]],
       decls: 1,
       vars: 1,
-      consts: [["class", "checkout", 4, "ngIf"], [1, "checkout"], ["text", "Pedido Calculado", 3, "clickedButtonBack"], [1, "card"], [1, "card-title"], ["class", "product", 4, "ngFor", "ngForOf"], [1, "total"], [1, "p-margin-right-auto"], ["title", "Voc\xEA pode pagar em dinheiro no caixa ou com o PIX 60520061000535", "icon", "moneyCard", "actionText", "Copiar Pix", 3, "description", "clicked"], [1, "action-fixed"], [1, "product"], [1, "product-qty"], [1, "product-name"], ["type", "button", "mat-icon-button", "", 1, "product-btnDetails", 3, "matMenuTriggerFor"], [1, "icon", "icon-more"], [0, "xlink", "href", "#icon-more"], ["menu", "matMenu"], ["mat-menu-item", "", "type", "button", 3, "click"], [1, "icon", "icon-trash"], [0, "xlink", "href", "#icon-trash"], ["class", "additional", 4, "ngFor", "ngForOf"], [1, "additional"], [4, "ngFor", "ngForOf"], [1, "additional-qty"]],
+      consts: [["class", "checkout", 4, "ngIf"], [1, "checkout"], ["text", "Pedido Calculado", 3, "clickedButtonBack"], [1, "card"], [1, "card-title"], ["class", "product", 4, "ngFor", "ngForOf"], [1, "total"], [1, "p-margin-right-auto"], ["title", "Voc\xEA pode pagar em dinheiro no caixa ou com o PIX", "icon", "moneyCard", "actionText", "Copiar Pix", 3, "description", "clicked"], [1, "action-fixed"], [1, "product"], [1, "product-qty"], [1, "product-name"], ["type", "button", "mat-icon-button", "", 1, "product-btnDetails", 3, "matMenuTriggerFor"], [1, "icon", "icon-more"], [0, "xlink", "href", "#icon-more"], ["menu", "matMenu"], ["mat-menu-item", "", "type", "button", 3, "click"], [1, "icon", "icon-trash"], [0, "xlink", "href", "#icon-trash"], ["class", "additional", 4, "ngFor", "ngForOf"], [1, "additional"], [4, "ngFor", "ngForOf"], [1, "additional-qty"]],
       template: function CheckoutComponent_Template(rf, ctx) {
         if (rf & 1) {
           _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](0, CheckoutComponent_section_0_Template, 18, 5, "section", 0);
