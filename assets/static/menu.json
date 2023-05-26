@@ -10,8 +10,8 @@
         "products": [{
                 "id": 1,
                 "name": "Salgado",
-                "description": "Coxinha ou Esfirra",
-                "price": 600,
+                "description": "Coxinha, Bolinho Caipira ou Kibe",
+                "price": 700,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
@@ -20,7 +20,7 @@
                 "id": 2,
                 "name": "Pastel",
                 "description": "Queijo, Pizza, Frango ou Carne",
-                "price": 600,
+                "price": 700,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
@@ -29,7 +29,7 @@
                 "id": 3,
                 "name": "Churrasco",
                 "description": "Frango ou Carne",
-                "price": 800,
+                "price": 1000,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
@@ -38,7 +38,7 @@
                 "id": 4,
                 "name": "Caldo",
                 "description": "Feijão, Mandioca ou Canja",
-                "price": 800,
+                "price": 1000,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
@@ -72,18 +72,18 @@
             },
             {
                 "id": 8,
-                "name": "Vinho Copo",
+                "name": "Vinho Copo ou Vinho quente",
                 "description": null,
-                "price": 600,
+                "price": 500,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
             },
             {
                 "id": 9,
-                "name": "Vinho Quente",
+                "name": "Quentão",
                 "description": null,
-                "price": 600,
+                "price": 500,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
@@ -92,7 +92,7 @@
                 "id": 10,
                 "name": "Chocolate Quente",
                 "description": null,
-                "price": 600,
+                "price": 500,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
@@ -101,7 +101,7 @@
                 "id": 11,
                 "name": "Cachorro-quente",
                 "description": null,
-                "price": 800,
+                "price": 1000,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
@@ -110,7 +110,7 @@
                 "id": 12,
                 "name": "Lanche de calabresa",
                 "description": null,
-                "price": 1200,
+                "price": 1500,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
@@ -119,14 +119,14 @@
                 "id": 13,
                 "name": "Pernil",
                 "description": null,
-                "price": 1200,
+                "price": 1500,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
             },
             {
                 "id": 14,
-                "name": "Doce Pequeno",
+                "name": "Doces Variados",
                 "description": null,
                 "price": 300,
                 "adultsOnly": false,
@@ -135,7 +135,7 @@
             },
             {
                 "id": 15,
-                "name": "Doce Grande",
+                "name": "Doces Especiais",
                 "description": null,
                 "price": 500,
                 "adultsOnly": false,
@@ -144,9 +144,27 @@
             },
             {
                 "id": 16,
-                "name": "Bolo de Santa Clara",
+                "name": "Mini Pizza",
                 "description": null,
-                "price": 1000,
+                "price": 600,
+                "adultsOnly": false,
+                "enabled": true,
+                "additionalItemsGroups": []
+            },
+            {
+                "id": 17,
+                "name": "Chocolate",
+                "description": null,
+                "price": 800,
+                "adultsOnly": false,
+                "enabled": true,
+                "additionalItemsGroups": []
+            },
+            {
+                "id": 18,
+                "name": "Mini Pizza",
+                "description": null,
+                "price": 600,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
