@@ -162,9 +162,9 @@
             },
             {
                 "id": 18,
-                "name": "Mini Pizza",
+                "name": "Peixinho",
                 "description": null,
-                "price": 600,
+                "price": 500,
                 "adultsOnly": false,
                 "enabled": true,
                 "additionalItemsGroups": []
