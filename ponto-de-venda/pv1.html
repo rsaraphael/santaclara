@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Gerador de QR Code PIX</title>
+  <title>Santa Clara - Ponto de Venda móvel</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     body {
@@ -94,7 +94,7 @@
   </style>
 </head>
 <body>
-  <h1>Gerador de QR Code PIX</h1>
+  <h1>Santa Clara - Ponto de Venda móvel</h1>
 
   <h2>Produtos:</h2>
   <div id="botoes-produtos"></div>
@@ -154,6 +154,7 @@
         btn.onclick = () => adicionarProduto(p.nome, p.preco);
         botoesDiv.appendChild(btn);
       });
+      carregarTabela();
     };
 
     function adicionarProduto(nome, preco) {
@@ -246,9 +247,35 @@
       botao.className = "remove-produto-btn";
       botao.onclick = () => {
         corpoTabela.deleteRow(novaLinha.rowIndex - 1);
+        salvarTabela();
         atualizarTotalTabela();
       };
       novaLinha.insertCell().appendChild(botao);
+      salvarTabela();
+      atualizarTotalTabela();
+    }
+
+    function salvarTabela() {
+      const dados = [...corpoTabela.rows].map(r => r.cells[0].innerText);
+      localStorage.setItem("valoresPIX", JSON.stringify(dados));
+    }
+
+    function carregarTabela() {
+      const dados = JSON.parse(localStorage.getItem("valoresPIX") || "[]");
+      corpoTabela.innerHTML = "";
+      dados.forEach(valor => {
+        const novaLinha = corpoTabela.insertRow();
+        novaLinha.insertCell().innerText = valor;
+        const botao = document.createElement("button");
+        botao.textContent = "Remover";
+        botao.className = "remove-produto-btn";
+        botao.onclick = () => {
+          corpoTabela.deleteRow(novaLinha.rowIndex - 1);
+          salvarTabela();
+          atualizarTotalTabela();
+        };
+        novaLinha.insertCell().appendChild(botao);
+      });
       atualizarTotalTabela();
     }
 
