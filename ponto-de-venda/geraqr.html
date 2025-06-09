@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Gerador de QR Code PIX</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 30px;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    #qrcode-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    table {
+      margin: 40px auto 0 auto;
+      border-collapse: collapse;
+      width: 300px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .remove-btn {
+      background-color: red;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gerador de QR Code PIX</h1>
+  <p>Insira o valor (em reais):</p>
+  <input
+    type="text"
+    id="valor"
+    inputmode="numeric"
+    pattern="[0-9]*"
+    placeholder="Ex: 10"
+  />
+  <br>
+  <button onclick="gerarQRCode()">Gerar QR Code</button>
+  <button onclick="limpar()">Limpar</button>
+
+  <div id="qrcode-container">
+    <div id="qrcode"></div>
+  </div>
+
+  <table id="lista-valores">
+    <thead>
+      <tr>
+        <th>Valor (R$)</th>
+        <th>Ação</th>
+      </tr>
+    </thead>
+    <tbody id="corpo-tabela">
+    </tbody>
+    <tfoot>
+      <tr>
+        <th>Total</th>
+        <th id="total">R$ 0.00</th>
+      </tr>
+    </tfoot>
+  </table>
+
+  <script>
+    let valores = [];
+
+    function gerarQRCode() {
+      const valorInput = document.getElementById("valor");
+      const valorBruto = valorInput.value.replace(/\D/g, "");
+      const valor = parseInt(valorBruto);
+
+      const cnpj = "60520061000535";
+
+      if (isNaN(valor) || valor <= 0) {
+        alert("Por favor, insira um valor válido.");
+        return;
+      }
+
+      // Adiciona valor à lista
+      valores.push(valor);
+      atualizarTabela();
+
+      function format(id, value) {
+        return id + value.length.toString().padStart(2, '0') + value;
+      }
+
+      function montarPayloadPix(cnpj, valor) {
+        const payloadFormat = "000201";
+        const merchantAccountInfo = format("26", 
+          format("00", "BR.GOV.BCB.PIX") +
+          format("01", cnpj)
+        );
+        const merchantCategoryCode = "52040000";
+        const transactionCurrency = "5303986";
+        const transactionAmount = format("54", valor.toFixed(2));
+        const countryCode = "5802BR";
+        const merchantName = format("59", "Convento Santa Clara");
+        const merchantCity = format("60", "Taubate");
+        const additionalDataField = format("62", format("05", "***"));
+
+        let payloadSemCRC = payloadFormat + merchantAccountInfo + merchantCategoryCode +
+                            transactionCurrency + transactionAmount + countryCode +
+                            merchantName + merchantCity + additionalDataField;
+
+        const crc16 = calcularCRC16(payloadSemCRC + "6304");
+        return payloadSemCRC + "6304" + crc16;
+      }
+
+      function calcularCRC16(str) {
+        let crc = 0xFFFF;
+        for (let i = 0; i < str.length; i++) {
+          crc ^= str.charCodeAt(i) << 8;
+          for (let j = 0; j < 8; j++) {
+            crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+            crc &= 0xFFFF;
+          }
+        }
+        return crc.toString(16).toUpperCase().padStart(4, "0");
+      }
+
+      const payload = montarPayloadPix(cnpj, valor);
+      const qrCodeDiv = document.getElementById("qrcode");
+      qrCodeDiv.innerHTML = "";
+
+      new QRCode(qrCodeDiv, {
+        text: payload,
+        width: 256,
+        height: 256
+      });
+    }
+
+    function limpar() {
+      document.getElementById("valor").value = "";
+      document.getElementById("qrcode").innerHTML = "";
+    }
+
+    function atualizarTabela() {
+      const corpoTabela = document.getElementById("corpo-tabela");
+      corpoTabela.innerHTML = "";
+
+      let total = 0;
+
+      valores.forEach((valor, index) => {
+        total += valor;
+
+        const row = document.createElement("tr");
+
+        const valorCell = document.createElement("td");
+        valorCell.textContent = `R$ ${valor.toFixed(2)}`;
+
+        const acaoCell = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.textContent = "Remover";
+        btn.className = "remove-btn";
+        btn.onclick = () => {
+          valores.splice(index, 1);
+          atualizarTabela();
+        };
+
+        acaoCell.appendChild(btn);
+        row.appendChild(valorCell);
+        row.appendChild(acaoCell);
+        corpoTabela.appendChild(row);
+      });
+
+      document.getElementById("total").textContent = `R$ ${total.toFixed(2)}`;
+    }
+  </script>
+</body>
+</html>
+

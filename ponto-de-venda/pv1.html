@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gerador de QR Code PIX</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+    h1, h2, h3 {
+      color: #2c3e50;
+    }
+    #qrcode {
+      text-align: center;
+      margin: 20px 0;
+    }
+    .produto-btn {
+      margin: 5px;
+      padding: 10px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .produto-btn:hover {
+      background-color: #2980b9;
+    }
+    #lista-itens div {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 5px 0;
+      background-color: #ecf0f1;
+      padding: 8px;
+      border-radius: 5px;
+    }
+    .remove-produto-btn, .menos-produto-btn {
+      margin-left: 10px;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .remove-produto-btn { background-color: #e74c3c; }
+    .menos-produto-btn { background-color: #f39c12; }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 1em;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 5px;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .acao-btn {
+      background-color: #2ecc71;
+      color: white;
+    }
+    .limpar-btn {
+      background-color: #e67e22;
+      color: white;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    @media (max-width: 600px) {
+      .produto-btn {
+        width: 100%;
+        margin: 5px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Gerador de QR Code PIX</h1>
+
+  <h2>Produtos:</h2>
+  <div id="botoes-produtos"></div>
+
+  <div id="lista-itens"></div>
+
+  <label for="valor">Valor (R$):</label>
+  <input type="text" id="valor" inputmode="numeric" pattern="[0-9]*" placeholder="Ex: 10" />
+
+  <button class="acao-btn" onclick="gerarQRCode()">Gerar QR Code</button>
+  <button class="limpar-btn" onclick="limpar()">Limpar</button>
+
+  <div id="qrcode"></div>
+
+  <h2>Valores Gerados:</h2>
+  <table>
+    <thead>
+      <tr><th>Valor</th><th>Ação</th></tr>
+    </thead>
+    <tbody id="corpo-tabela"></tbody>
+    <tfoot>
+      <tr><td>Total</td><td id="total">R$ 0,00</td></tr>
+    </tfoot>
+  </table>
+
+  <script>
+    const produtos = [
+      { nome: "Bolinho caipira/coxinha/quibe", preco: 8 },
+      { nome: "Pastel", preco: 10 },
+      { nome: "Churrasco", preco: 10 },
+      { nome: "Caldinho", preco: 15 },
+      { nome: "Cachorro-quente", preco: 10 },
+      { nome: "Lanche de pernil", preco: 15 },
+      { nome: "Lanche de calabresa", preco: 15 },
+      { nome: "Mini-Pizza", preco: 10 },
+      { nome: "Doces variados", preco: 5 },
+      { nome: "Chocolate - Morango", preco: 15 },
+      { nome: "Chocolate - Cone", preco: 10 },
+      { nome: "Refrigerantes", preco: 7 },
+      { nome: "Suco", preco: 7 },
+      { nome: "Água", preco: 3 },
+      { nome: "Bebidas quentes", preco: 6 },
+      { nome: "Peixinho", preco: 5 }
+    ];
+
+    let produtosSelecionados = [];
+    let bloqueiaInputValor = false;
+    const corpoTabela = document.getElementById("corpo-tabela");
+    const totalEl = document.getElementById("total");
+
+    window.onload = () => {
+      const botoesDiv = document.getElementById("botoes-produtos");
+      produtos.forEach(p => {
+        const btn = document.createElement("button");
+        btn.textContent = `${p.nome} - R$ ${p.preco}`;
+        btn.className = "produto-btn";
+        btn.onclick = () => adicionarProduto(p.nome, p.preco);
+        botoesDiv.appendChild(btn);
+      });
+    };
+
+    function adicionarProduto(nome, preco) {
+      if (!bloqueiaInputValor) {
+        document.getElementById("valor").readOnly = true;
+        bloqueiaInputValor = true;
+      }
+      produtosSelecionados.push({ nome, preco });
+      atualizarListaProdutos();
+    }
+
+    function atualizarListaProdutos() {
+      const lista = {};
+      for (const p of produtosSelecionados) {
+        if (!lista[p.nome]) lista[p.nome] = { preco: p.preco, qtd: 0 };
+        lista[p.nome].qtd++;
+      }
+
+      const listaDiv = document.getElementById("lista-itens");
+      listaDiv.innerHTML = "<h3>Produtos adicionados:</h3>";
+
+      for (const nome in lista) {
+        const item = lista[nome];
+        const totalItem = item.qtd * item.preco;
+
+        const linha = document.createElement("div");
+        linha.innerHTML = `• ${nome} — ${item.qtd}x — R$ ${totalItem.toFixed(2)}`;
+
+        const btnMenos = document.createElement("button");
+        btnMenos.textContent = "-1";
+        btnMenos.className = "menos-produto-btn";
+        btnMenos.onclick = () => diminuirProduto(nome);
+
+        const btnRemover = document.createElement("button");
+        btnRemover.textContent = "Remover";
+        btnRemover.className = "remove-produto-btn";
+        btnRemover.onclick = () => removerProduto(nome);
+
+        linha.appendChild(btnMenos);
+        linha.appendChild(btnRemover);
+        listaDiv.appendChild(linha);
+      }
+
+      document.getElementById("valor").value = calcularTotalProdutos();
+    }
+
+    function diminuirProduto(nome) {
+      const idx = produtosSelecionados.findIndex(p => p.nome === nome);
+      if (idx >= 0) {
+        produtosSelecionados.splice(idx, 1);
+        atualizarListaProdutos();
+      }
+    }
+
+    function removerProduto(nome) {
+      produtosSelecionados = produtosSelecionados.filter(p => p.nome !== nome);
+      atualizarListaProdutos();
+    }
+
+    function calcularTotalProdutos() {
+      return produtosSelecionados.reduce((acc, p) => acc + p.preco, 0);
+    }
+
+    function gerarQRCode() {
+      const valor = parseInt(document.getElementById("valor").value);
+      if (!valor || valor <= 0) {
+        alert("Informe um valor válido.");
+        return;
+      }
+
+      const chave = "60520061000535";
+      const nome = "Convento Santa Clara";
+      const cidade = "Taubate";
+      const txid = "TX" + Date.now();
+      const valorFormatado = valor.toFixed(2);
+
+      const payload = `00020126360014BR.GOV.BCB.PIX011460520061000535520400005303986540${valorFormatado.length}${valorFormatado}5802BR5919${nome}6007${cidade}62070503${txid}6304`;
+
+      document.getElementById("qrcode").innerHTML = "";
+      new QRCode(document.getElementById("qrcode"), {
+        text: payload,
+        width: 256,
+        height: 256
+      });
+
+      const novaLinha = corpoTabela.insertRow();
+      novaLinha.insertCell().innerText = `R$ ${valorFormatado}`;
+      const botao = document.createElement("button");
+      botao.textContent = "Remover";
+      botao.className = "remove-produto-btn";
+      botao.onclick = () => {
+        corpoTabela.deleteRow(novaLinha.rowIndex - 1);
+        atualizarTotalTabela();
+      };
+      novaLinha.insertCell().appendChild(botao);
+      atualizarTotalTabela();
+    }
+
+    function atualizarTotalTabela() {
+      const valores = [...corpoTabela.rows].map(r =>
+        parseFloat(r.cells[0].innerText.replace("R$", "").replace(",", "."))
+      );
+      const total = valores.reduce((a, b) => a + b, 0);
+      totalEl.innerText = `R$ ${total.toFixed(2)}`;
+    }
+
+    function limpar() {
+      produtosSelecionados = [];
+      bloqueiaInputValor = false;
+      const valorInput = document.getElementById("valor");
+      valorInput.value = "";
+      valorInput.readOnly = false;
+      document.getElementById("qrcode").innerHTML = "";
+      document.getElementById("lista-itens").innerHTML = "";
+    }
+  </script>
+</body>
+</html>
