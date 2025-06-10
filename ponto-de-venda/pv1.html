@@ -91,12 +91,23 @@
     .acao-btn {
       background-color: #2ecc71;
       color: white;
-      font-size: 2em;
+      font-size: 1.5em;
     }
     .limpar-btn {
       background-color: #e67e22;
       color: white;
-      font-size: 2em;
+      font-size: 1.5em;
+    }
+    .limpar-tudo-btn {
+      background-color: red;
+      color: white;
+      font-size: 0.5em;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 5px;
+      font-weight: bold;
+      float: right;
+      margin-top: 10px;
     }
     table {
       width: 100%;
@@ -108,6 +119,11 @@
       padding: 10px;
       border: 1px solid #ccc;
       text-align: center;
+    }
+    #limpar-tudo-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
     }
     @media (max-width: 600px) {
       #botoes-produtos {
@@ -146,6 +162,7 @@
     </tfoot>
   </table>
 
+  <button class="limpar-tudo-btn" onclick="limparTudo()">Limpar Tudo</button>
   <script>
     class Pix {
   constructor(pixKey, description, merchantName, merchantCity, txid, amount) {
@@ -311,6 +328,7 @@
 
       const linha = document.createElement("div");
       linha.innerHTML = `• ${nome} — ${item.qtd}x — R$ ${totalItem.toFixed(2)}`;
+      linha.style.fontSize = "2em";
 
       const acoesDiv = document.createElement("div");
       acoesDiv.className = "acoes-item";
@@ -321,7 +339,7 @@
       btnMenos.onclick = () => diminuirProduto(nome);
 
       const btnRemover = document.createElement("button");
-      btnRemover.textContent = "X";
+      btnRemover.textContent = "Remover";
       btnRemover.className = "remove-produto-btn";
       btnRemover.onclick = () => removerProduto(nome);
 
@@ -437,6 +455,18 @@
       document.getElementById("qrcode").innerHTML = "";
       document.getElementById("lista-itens").innerHTML = "";
     }
+
+    function limparTudo() {
+    produtosSelecionados = [];
+    bloqueiaInputValor = false;
+    document.getElementById("valor").value = "";
+    document.getElementById("valor").readOnly = false;
+    document.getElementById("qrcode").innerHTML = "";
+    document.getElementById("lista-itens").innerHTML = "";
+    corpoTabela.innerHTML = "";
+    localStorage.removeItem("valoresPIX");
+    atualizarTotalTabela();
+  }
   </script>
 </body>
 </html>
