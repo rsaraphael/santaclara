@@ -263,7 +263,6 @@
         }
       }
     }
-
     return this.ID_CRC16 + "04" + dechex(resultado).toUpperCase();
   }
 }
@@ -385,7 +384,7 @@
       const chave = "60520061000535";
       const nome = "CONVENTOSANTACLARA";
       const cidade = "Taubate";
-      const txid = "Quermesse"
+      const txid = '' + Math.floor(Math.random() * 1000000);
       const valorFormatado = valor.toFixed(2);
       console.log(valor);
 
