@@ -7,7 +7,6 @@
   <style>
     body {
       font-family: sans-serif;
-      /* max-width: 600px; */
       margin: auto;
       padding: 20px;
       background-color: #f4f4f9;
@@ -20,17 +19,28 @@
       text-align: center;
       margin: 20px 0;
     }
+    #botoes-produtos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
     .produto-btn {
-      margin: 5px;
-      padding: 20px;
-      background-color: #3498db;
-      color: white;
+      flex: 1 1 calc(50% - 10px);
+      padding: 15px;
+      font-size: 1rem;
+      color: black;
       border: none;
       border-radius: 5px;
       cursor: pointer;
     }
+    #botoes-produtos .produto-btn:nth-child(odd) {
+      background-color: #3498db; /* azul */
+    }
+    #botoes-produtos .produto-btn:nth-child(even) {
+      background-color: #2ecc71; /* verde */
+    }
     .produto-btn:hover {
-      background-color: #2980b9;
+      opacity: 0.9;
     }
     #lista-itens div {
       display: flex;
@@ -41,16 +51,24 @@
       padding: 8px;
       border-radius: 5px;
     }
+    .acoes-item {
+      display: flex;
+      gap: 5px;
+      margin-left: auto;
+    }
     .remove-produto-btn, .menos-produto-btn {
-      margin-left: 10px;
       color: white;
       border: none;
       padding: 4px 8px;
       border-radius: 3px;
       cursor: pointer;
     }
-    .remove-produto-btn { background-color: #e74c3c; }
-    .menos-produto-btn { background-color: #f39c12; }
+    .menos-produto-btn {
+      background-color: #f39c12;
+    }
+    .remove-produto-btn {
+      background-color: #e74c3c;
+    }
     input[type="text"] {
       width: 100%;
       padding: 10px;
@@ -86,9 +104,11 @@
       text-align: center;
     }
     @media (max-width: 600px) {
+      #botoes-produtos {
+        gap: 8px;
+      }
       .produto-btn {
-        width: 100%;
-        margin: 5px 0;
+        flex: 1 1 calc(50% - 8px);
       }
     }
   </style>
@@ -270,39 +290,43 @@
     }
 
     function atualizarListaProdutos() {
-      const lista = {};
-      for (const p of produtosSelecionados) {
-        if (!lista[p.nome]) lista[p.nome] = { preco: p.preco, qtd: 0 };
-        lista[p.nome].qtd++;
-      }
-
-      const listaDiv = document.getElementById("lista-itens");
-      listaDiv.innerHTML = "<h3>Produtos adicionados:</h3>";
-
-      for (const nome in lista) {
-        const item = lista[nome];
-        const totalItem = item.qtd * item.preco;
-
-        const linha = document.createElement("div");
-        linha.innerHTML = `• ${nome} — ${item.qtd}x — R$ ${totalItem.toFixed(2)}`;
-
-        const btnMenos = document.createElement("button");
-        btnMenos.textContent = "-1";
-        btnMenos.className = "menos-produto-btn";
-        btnMenos.onclick = () => diminuirProduto(nome);
-
-        const btnRemover = document.createElement("button");
-        btnRemover.textContent = "Remover";
-        btnRemover.className = "remove-produto-btn";
-        btnRemover.onclick = () => removerProduto(nome);
-
-        linha.appendChild(btnMenos);
-        linha.appendChild(btnRemover);
-        listaDiv.appendChild(linha);
-      }
-
-      document.getElementById("valor").value = calcularTotalProdutos();
+    const lista = {};
+    for (const p of produtosSelecionados) {
+      if (!lista[p.nome]) lista[p.nome] = { preco: p.preco, qtd: 0 };
+      lista[p.nome].qtd++;
     }
+
+    const listaDiv = document.getElementById("lista-itens");
+    listaDiv.innerHTML = "<h3>Produtos adicionados:</h3>";
+
+    for (const nome in lista) {
+      const item = lista[nome];
+      const totalItem = item.qtd * item.preco;
+
+      const linha = document.createElement("div");
+      linha.innerHTML = `• ${nome} — ${item.qtd}x — R$ ${totalItem.toFixed(2)}`;
+
+      const acoesDiv = document.createElement("div");
+      acoesDiv.className = "acoes-item";
+
+      const btnMenos = document.createElement("button");
+      btnMenos.textContent = "-1";
+      btnMenos.className = "menos-produto-btn";
+      btnMenos.onclick = () => diminuirProduto(nome);
+
+      const btnRemover = document.createElement("button");
+      btnRemover.textContent = "Remover";
+      btnRemover.className = "remove-produto-btn";
+      btnRemover.onclick = () => removerProduto(nome);
+
+      acoesDiv.appendChild(btnMenos);
+      acoesDiv.appendChild(btnRemover);
+      linha.appendChild(acoesDiv);
+      listaDiv.appendChild(linha);
+    }
+
+    document.getElementById("valor").value = calcularTotalProdutos();
+  }
 
     function diminuirProduto(nome) {
       const idx = produtosSelecionados.findIndex(p => p.nome === nome);
