@@ -563,7 +563,7 @@ function App() {
   const filteredSales = adminFilter === 'all'
     ? [...sales].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     : [...sales]
-        .filter(sale => sale.paymentMethod.toLowerCase() === adminFilter)
+        .filter(sale => sale.paymentMethod.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') === adminFilter)
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
 
   const overallTotal = sales.reduce((sum, sale) => sum + sale.total, 0)
