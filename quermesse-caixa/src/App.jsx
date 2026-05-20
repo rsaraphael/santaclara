@@ -673,18 +673,6 @@ function App() {
           <Grid container spacing={3}>
             {/* Product Grid */}
             <Grid item xs={12} md={8}>
-              <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {categories.map(category => (
-                  <Chip
-                    key={category}
-                    label={category}
-                    onClick={() => setSelectedCategory(category)}
-                    color={selectedCategory === category ? 'primary' : 'default'}
-                    sx={{ cursor: 'pointer' }}
-                  />
-                ))}
-              </Box>
-
               <Grid container spacing={2}>
                 {filteredProducts.map(product => (
                   <Grid item xs={12} sm={6} md={4} key={product.id}>
@@ -715,6 +703,41 @@ function App() {
                   </Grid>
                 ))}
               </Grid>
+
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {categories.map(category => (
+                    <Chip
+                      key={category}
+                      label={category}
+                      onClick={() => setSelectedCategory(category)}
+                      color={selectedCategory === category ? 'primary' : 'default'}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  ))}
+                </Box>
+
+                <FormControl component="fieldset">
+                  <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>Modo das Fichas</FormLabel>
+                  <RadioGroup
+                    row
+                    value={changeMode}
+                    onChange={handleChangeModeChange}
+                    sx={{ mt: 0.5, '& .MuiFormControlLabel-label': { fontSize: '0.75rem' } }}
+                  >
+                    <FormControlLabel
+                      value="normal"
+                      control={<Radio size="small" />}
+                      label="Normal"
+                    />
+                    <FormControlLabel
+                      value="privilegiar_troco"
+                      control={<Radio size="small" />}
+                      label="Privilegiar Troco"
+                    />
+                  </RadioGroup>
+                </FormControl>
+              </Box>
             </Grid>
 
             {/* Cart Panel */}
@@ -1181,7 +1204,7 @@ function App() {
                 </Typography>
 
                 <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
-                  <FormLabel component="legend">Modo de Troco</FormLabel>
+                  <FormLabel component="legend">Modo das Fichas</FormLabel>
                   <RadioGroup
                     row
                     value={changeMode}
