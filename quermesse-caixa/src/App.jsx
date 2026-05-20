@@ -131,7 +131,7 @@ function App() {
   }
 
   useEffect(() => {
-    fetch('./products.json')
+    fetch('/products.json')
       .then(res => res.json())
       .then(data => setProducts(data))
       .catch(err => console.error('Erro ao carregar produtos:', err))
@@ -302,12 +302,49 @@ function App() {
   }
 
   const calculateChange = (amount, mode, availableFichas) => {
-    const result = { 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 }
     let remaining = Math.round(amount * 100) // Work with cents
+
+    // Calculate ideal breakdown (no limits)
+    const idealResult = { 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 }
+    let idealRemaining = remaining
+
+    if (mode === 'privilegiar_troco') {
+      const preferred = [5, 2, 10, 20, 1]
+      for (const denom of preferred) {
+        const count = Math.floor(idealRemaining / (denom * 100))
+        idealResult[denom] = count
+        idealRemaining -= count * denom * 100
+      }
+    } else {
+      for (const denom of DENOMINATIONS) {
+        const count = Math.floor(idealRemaining / (denom * 100))
+        idealResult[denom] = count
+        idealRemaining -= count * denom * 100
+      }
+    }
+
+    // Check if ideal breakdown is possible with available fichas
+    let canProvideIdeal = true
+    for (const denom of DENOMINATIONS) {
+      if (idealResult[denom] > (availableFichas[denom] || 0)) {
+        canProvideIdeal = false
+        break
+      }
+    }
+
+    // If ideal is possible, return it
+    if (canProvideIdeal) {
+      const totalChange = Object.entries(idealResult).reduce((sum, [denom, count]) => {
+        return sum + (parseInt(denom) * count)
+      }, 0)
+      return { result: idealResult, totalChange, remaining: 0, shortage: 0 }
+    }
+
+    // Otherwise, use available fichas with fallback
+    const result = { 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 }
     const fichasCopy = { ...availableFichas }
 
     if (mode === 'privilegiar_troco') {
-      // Prefer 5s and 2s first for better future change
       const preferred = [5, 2, 10, 20, 1]
       for (const denom of preferred) {
         const count = Math.min(remaining / (denom * 100), fichasCopy[denom])
@@ -316,7 +353,6 @@ function App() {
         fichasCopy[denom] -= result[denom]
       }
     } else {
-      // Normal mode: greedy with largest bills first
       for (const denom of DENOMINATIONS) {
         const count = Math.min(remaining / (denom * 100), fichasCopy[denom])
         result[denom] = Math.floor(count)
@@ -325,7 +361,7 @@ function App() {
       }
     }
 
-    // If we couldn't make exact change, try to use remaining bills (low number of cells approach)
+    // Fallback: use other available fichas
     if (remaining > 0) {
       for (const denom of DENOMINATIONS.sort((a, b) => b - a)) {
         while (remaining >= denom * 100 && fichasCopy[denom] > 0) {
@@ -336,14 +372,10 @@ function App() {
       }
     }
 
-    // Calculate total change value (actual amount that can be given)
     const totalChange = Object.entries(result).reduce((sum, [denom, count]) => {
       return sum + (parseInt(denom) * count)
     }, 0)
-
-    // Calculate the shortage (amount that couldn't be given)
-    const requiredChange = amount
-    const shortage = Math.max(0, requiredChange - totalChange)
+    const shortage = Math.max(0, amount - totalChange)
 
     return { result, totalChange, remaining, shortage }
   }
@@ -372,8 +404,7 @@ function App() {
     setAmountReceived(value)
     const received = parseFloat(value) || 0
     if (received >= total) {
-      const changeAmount = received - total
-      const { result, totalChange, remaining } = calculateChange(changeAmount, changeMode, fichas)
+      const { result, totalChange, remaining } = calculateChange(total, changeMode, fichas)
       setSuggestedChange({ result, totalChange, remaining })
     } else {
       setSuggestedChange({})
@@ -1340,11 +1371,6 @@ function App() {
                 return null
               })}
             </Box>
-            {fichasSuggestion && fichasSuggestion.remaining > 0 && (
-              <Typography variant="body2" color="error" sx={{ mt: 2 }}>
-                Faltam R$ {(fichasSuggestion.remaining / 100).toFixed(2)} em fichas (será dado o máximo possível)
-              </Typography>
-            )}
           </Paper>
 
           <Typography variant="body2" color="text.secondary">
@@ -1467,11 +1493,6 @@ function App() {
                       return null
                     })}
                   </Box>
-                  {suggestedChange.remaining > 0 && (
-                    <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-                      Faltam R$ {(suggestedChange.remaining / 100).toFixed(2)} em fichas (será dado o máximo possível)
-                    </Typography>
-                  )}
                 </Box>
               )}
             </>
