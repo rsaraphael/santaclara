@@ -1,0 +1,86 @@
+[
+  {
+    "id": 1,
+    "name": "Refrigerante",
+    "description": "350ml gelado",
+    "price": 5.00,
+    "category": "Bebidas"
+  },
+  {
+    "id": 2,
+    "name": "Água",
+    "description": "500ml mineral",
+    "price": 2.50,
+    "category": "Bebidas"
+  },
+  {
+    "id": 3,
+    "name": "Suco Natural",
+    "description": "500ml fresquinho",
+    "price": 6.00,
+    "category": "Bebidas"
+  },
+  {
+    "id": 4,
+    "name": "Cachorro Quente",
+    "description": "Com purê e batata palha",
+    "price": 8.00,
+    "category": "Lanches"
+  },
+  {
+    "id": 5,
+    "name": "Hambúrguer",
+    "description": "Artesanal com queijo",
+    "price": 12.00,
+    "category": "Lanches"
+  },
+  {
+    "id": 6,
+    "name": "Milho Cozido",
+    "description": "Com manteiga e sal",
+    "price": 4.00,
+    "category": "Lanches"
+  },
+  {
+    "id": 7,
+    "name": "Pipoca",
+    "description": "Salgada e crocante",
+    "price": 3.00,
+    "category": "Lanches"
+  },
+  {
+    "id": 8,
+    "name": "Churros",
+    "description": "Com chocolate e açúcar",
+    "price": 5.00,
+    "category": "Doces"
+  },
+  {
+    "id": 9,
+    "name": "Bolo de Cenoura",
+    "description": "Com cobertura de chocolate",
+    "price": 4.50,
+    "category": "Doces"
+  },
+  {
+    "id": 10,
+    "name": "Brigadeiro",
+    "description": "Unidade com chocolate granulado",
+    "price": 2.00,
+    "category": "Doces"
+  },
+  {
+    "id": 11,
+    "name": "Paçoca",
+    "description": "Amendoim triturado",
+    "price": 1.50,
+    "category": "Doces"
+  },
+  {
+    "id": 12,
+    "name": "Chocolates",
+    "description": "Sortidos variados",
+    "price": 3.50,
+    "category": "Doces"
+  }
+]
