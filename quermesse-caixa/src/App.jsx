@@ -131,7 +131,7 @@ function App() {
   }
 
   useEffect(() => {
-    fetch('/products.json')
+    fetch('./products.json')
       .then(res => res.json())
       .then(data => setProducts(data))
       .catch(err => console.error('Erro ao carregar produtos:', err))
