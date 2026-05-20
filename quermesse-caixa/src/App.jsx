@@ -298,86 +298,67 @@ function App() {
   const handleDinheiroPayment = () => {
     setPaymentDialogOpen(false)
     setAmountReceived('')
+    // Calculate fichas suggestion for total amount immediately
+    const { result, totalChange, remaining } = calculateChange(total, changeMode, fichas)
+    setSuggestedChange({ result, totalChange, remaining })
     setChangeDialogOpen(true)
   }
 
   const calculateChange = (amount, mode, availableFichas) => {
     let remaining = Math.round(amount * 100) // Work with cents
 
-    // Calculate ideal breakdown (no limits)
-    const idealResult = { 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 }
-    let idealRemaining = remaining
+    // First, try to suggest using available fichas following the mode
+    const availableResult = { 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 }
+    const fichasCopy = { ...availableFichas }
+    let availableRemaining = remaining
 
     if (mode === 'privilegiar_troco') {
       const preferred = [5, 2, 10, 20, 1]
       for (const denom of preferred) {
-        const count = Math.floor(idealRemaining / (denom * 100))
-        idealResult[denom] = count
-        idealRemaining -= count * denom * 100
+        const count = Math.min(availableRemaining / (denom * 100), fichasCopy[denom])
+        availableResult[denom] = Math.floor(count)
+        availableRemaining -= availableResult[denom] * denom * 100
+        fichasCopy[denom] -= availableResult[denom]
       }
     } else {
       for (const denom of DENOMINATIONS) {
-        const count = Math.floor(idealRemaining / (denom * 100))
-        idealResult[denom] = count
-        idealRemaining -= count * denom * 100
+        const count = Math.min(availableRemaining / (denom * 100), fichasCopy[denom])
+        availableResult[denom] = Math.floor(count)
+        availableRemaining -= availableResult[denom] * denom * 100
+        fichasCopy[denom] -= availableResult[denom]
       }
     }
 
-    // Check if ideal breakdown is possible with available fichas
-    let canProvideIdeal = true
-    for (const denom of DENOMINATIONS) {
-      if (idealResult[denom] > (availableFichas[denom] || 0)) {
-        canProvideIdeal = false
-        break
-      }
-    }
-
-    // If ideal is possible, return it
-    if (canProvideIdeal) {
-      const totalChange = Object.entries(idealResult).reduce((sum, [denom, count]) => {
+    // If exact change is possible with available fichas, use it
+    if (availableRemaining === 0) {
+      const totalChange = Object.entries(availableResult).reduce((sum, [denom, count]) => {
         return sum + (parseInt(denom) * count)
       }, 0)
-      return { result: idealResult, totalChange, remaining: 0, shortage: 0 }
+      return { result: availableResult, totalChange, remaining: 0, shortage: 0 }
     }
 
-    // Otherwise, use available fichas with fallback
-    const result = { 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 }
-    const fichasCopy = { ...availableFichas }
+    // Otherwise, suggest ideal breakdown (ignoring availability)
+    const idealResult = { 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 }
 
     if (mode === 'privilegiar_troco') {
       const preferred = [5, 2, 10, 20, 1]
       for (const denom of preferred) {
-        const count = Math.min(remaining / (denom * 100), fichasCopy[denom])
-        result[denom] = Math.floor(count)
-        remaining -= result[denom] * denom * 100
-        fichasCopy[denom] -= result[denom]
+        const count = Math.floor(remaining / (denom * 100))
+        idealResult[denom] = count
+        remaining -= count * denom * 100
       }
     } else {
       for (const denom of DENOMINATIONS) {
-        const count = Math.min(remaining / (denom * 100), fichasCopy[denom])
-        result[denom] = Math.floor(count)
-        remaining -= result[denom] * denom * 100
-        fichasCopy[denom] -= result[denom]
+        const count = Math.floor(remaining / (denom * 100))
+        idealResult[denom] = count
+        remaining -= count * denom * 100
       }
     }
 
-    // Fallback: use other available fichas
-    if (remaining > 0) {
-      for (const denom of DENOMINATIONS.sort((a, b) => b - a)) {
-        while (remaining >= denom * 100 && fichasCopy[denom] > 0) {
-          result[denom]++
-          remaining -= denom * 100
-          fichasCopy[denom]--
-        }
-      }
-    }
-
-    const totalChange = Object.entries(result).reduce((sum, [denom, count]) => {
+    const totalChange = Object.entries(idealResult).reduce((sum, [denom, count]) => {
       return sum + (parseInt(denom) * count)
     }, 0)
-    const shortage = Math.max(0, amount - totalChange)
-
-    return { result, totalChange, remaining, shortage }
+    return { result: idealResult, totalChange, remaining: 0, shortage: 0 }
   }
 
   const calculateReceivedBills = (amount) => {
@@ -403,12 +384,9 @@ function App() {
   const handleAmountReceivedChange = (value) => {
     setAmountReceived(value)
     const received = parseFloat(value) || 0
-    if (received >= total) {
-      const { result, totalChange, remaining } = calculateChange(total, changeMode, fichas)
-      setSuggestedChange({ result, totalChange, remaining })
-    } else {
-      setSuggestedChange({})
-    }
+    // Always calculate fichas for total amount
+    const { result, totalChange, remaining } = calculateChange(total, changeMode, fichas)
+    setSuggestedChange({ result, totalChange, remaining })
   }
 
   const confirmSale = (paymentMethod) => {
@@ -1453,6 +1431,34 @@ function App() {
             Total a pagar: <strong>R$ {total.toFixed(2)}</strong>
           </Typography>
 
+          <Divider sx={{ my: 2 }} />
+
+          {suggestedChange.result && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Fichas a entregar ({changeMode === 'privilegiar_troco' ? 'Privilegiar' : 'Normal'}):
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {DENOMINATIONS.map((denom) => {
+                  const count = suggestedChange.result[denom] || 0
+                  if (count > 0) {
+                    return (
+                      <Chip
+                        key={denom}
+                        label={`${count}x Ficha R$ ${denom}`}
+                        color="success"
+                        variant="outlined"
+                      />
+                    )
+                  }
+                  return null
+                })}
+              </Box>
+            </Box>
+          )}
+
+          <Divider sx={{ my: 2 }} />
+
           <TextField
             fullWidth
             label="Valor Recebido"
@@ -1464,43 +1470,18 @@ function App() {
             sx={{ mt: 2 }}
           />
 
-          {amountReceived && parseFloat(amountReceived) >= total ? (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="h6" color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CheckCircleIcon />
-                Troco: R$ {(parseFloat(amountReceived) - total).toFixed(2)}
-              </Typography>
+          {amountReceived && parseFloat(amountReceived) >= total && (
+            <Typography variant="h6" color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+              <CheckCircleIcon />
+              Troco: R$ {(parseFloat(amountReceived) - total).toFixed(2)}
+            </Typography>
+          )}
 
-              {suggestedChange.result && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Fichas a entregar ({changeMode === 'privilegiar_troco' ? 'Privilegiar' : 'Normal'}):
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {DENOMINATIONS.map((denom) => {
-                      const count = suggestedChange.result[denom] || 0
-                      if (count > 0) {
-                        return (
-                          <Chip
-                            key={denom}
-                            label={`${count}x Ficha R$ ${denom}`}
-                            color="success"
-                            variant="outlined"
-                          />
-                        )
-                      }
-                      return null
-                    })}
-                  </Box>
-                </Box>
-              )}
-            </>
-          ) : amountReceived && parseFloat(amountReceived) < total ? (
+          {amountReceived && parseFloat(amountReceived) < total && (
             <Typography variant="body2" color="error" sx={{ mt: 1 }}>
               Valor insuficiente. Faltam R$ {(total - parseFloat(amountReceived)).toFixed(2)}
             </Typography>
-          ) : null}
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => {
