@@ -78,8 +78,7 @@ function App() {
   const [fichasSuggestion, setFichasSuggestion] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [addFichaDialogOpen, setAddFichaDialogOpen] = useState(false)
-  const [addFichaInput, setAddFichaInput] = useState('')
-  const [addFichaType, setAddFichaType] = useState('20')
+  const [addFichaQuantities, setAddFichaQuantities] = useState({ 1: '', 2: '', 5: '', 10: '', 20: '' })
   const [addRealMoneyDialogOpen, setAddRealMoneyDialogOpen] = useState(false)
   const [addRealMoneyAmount, setAddRealMoneyAmount] = useState('')
   const [addRealMoneyType, setAddRealMoneyType] = useState('deposit')
@@ -172,10 +171,24 @@ function App() {
   }
 
   const addFichaFromTransaction = () => {
-    const denom = parseInt(addFichaType)
-    const quantity = parseInt(addFichaInput) || 0
-    if (quantity > 0) {
-      const newFichas = { ...fichas, [denom]: (fichas[denom] || 0) + quantity }
+    const newFichas = { ...fichas }
+    let hasEntries = false
+    const entries = []
+    let total = 0
+    const breakdown = {}
+
+    DENOMINATIONS.forEach((denom) => {
+      const quantity = parseInt(addFichaQuantities[denom]) || 0
+      if (quantity > 0) {
+        hasEntries = true
+        newFichas[denom] = (newFichas[denom] || 0) + quantity
+        entries.push(`${quantity}x R$ ${denom}`)
+        total += denom * quantity
+        breakdown[denom] = quantity
+      }
+    })
+
+    if (hasEntries) {
       saveFichasToStorage(newFichas)
 
       const transaction = {
@@ -183,14 +196,14 @@ function App() {
         timestamp: new Date().toISOString(),
         type: 'ficha',
         subType: 'entrada',
-        denomination: denom,
-        quantity,
-        total: denom * quantity
+        description: entries.join(', '),
+        breakdown,
+        total
       }
       const newTransactions = [...transactions, transaction]
       saveTransactionsToStorage(newTransactions)
 
-      setAddFichaInput('')
+      setAddFichaQuantities({ 1: '', 2: '', 5: '', 10: '', 20: '' })
       setAddFichaDialogOpen(false)
     }
   }
@@ -220,7 +233,15 @@ function App() {
     const transaction = transactions.find(t => t.id === transactionId)
     if (transaction && transaction.type === 'ficha' && transaction.subType === 'entrada') {
       const newFichas = { ...fichas }
-      newFichas[transaction.denomination] = Math.max(0, (newFichas[transaction.denomination] || 0) - transaction.quantity)
+      if (transaction.breakdown) {
+        // New format with multiple denominations
+        Object.entries(transaction.breakdown).forEach(([denom, quantity]) => {
+          newFichas[denom] = Math.max(0, (newFichas[denom] || 0) - quantity)
+        })
+      } else {
+        // Old format with single denomination
+        newFichas[transaction.denomination] = Math.max(0, (newFichas[transaction.denomination] || 0) - transaction.quantity)
+      }
       saveFichasToStorage(newFichas)
     }
 
@@ -999,8 +1020,7 @@ function App() {
                       startIcon={<AddIcon />}
                       onClick={() => {
                         setAddFichaDialogOpen(true)
-                        setAddFichaInput('')
-                        setAddFichaType('20')
+                        setAddFichaQuantities({ 1: '', 2: '', 5: '', 10: '', 20: '' })
                       }}
                     >
                       Adicionar Fichas
@@ -1101,7 +1121,7 @@ function App() {
                               </TableCell>
                               <TableCell>
                                 {transaction.type === 'ficha' ? (
-                                  `${transaction.quantity}x Ficha R$ ${transaction.denomination}`
+                                  transaction.description || `${transaction.quantity}x Ficha R$ ${transaction.denomination}`
                                 ) : transaction.subType === 'deposit' ? (
                                   'Entrada de dinheiro real'
                                 ) : (
@@ -1630,7 +1650,6 @@ function App() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Add Ficha Dialog */}
       <Dialog open={addFichaDialogOpen} onClose={() => setAddFichaDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
@@ -1643,40 +1662,34 @@ function App() {
           <Typography variant="body2" color="text.secondary" gutterBottom>
             Adicione fichas ao caixa. Isso sincronizará automaticamente com a aba Fichas.
           </Typography>
-          <TextField
-            fullWidth
-            label="Quantidade"
-            type="number"
-            value={addFichaInput}
-            onChange={(e) => setAddFichaInput(e.target.value)}
-            inputProps={{ min: 1 }}
-            autoFocus
-            sx={{ mt: 2 }}
-          />
-          <FormControl fullWidth sx={{ mt: 2 }}>
-            <FormLabel>Valor da Ficha</FormLabel>
-            <RadioGroup
-              row
-              value={addFichaType}
-              onChange={(e) => setAddFichaType(e.target.value)}
-            >
-              <FormControlLabel value="20" control={<Radio />} label="R$ 20" />
-              <FormControlLabel value="10" control={<Radio />} label="R$ 10" />
-              <FormControlLabel value="5" control={<Radio />} label="R$ 5" />
-              <FormControlLabel value="2" control={<Radio />} label="R$ 2" />
-              <FormControlLabel value="1" control={<Radio />} label="R$ 1" />
-            </RadioGroup>
-          </FormControl>
+          <Box sx={{ mt: 3 }}>
+            {DENOMINATIONS.map((denom) => (
+              <Box key={denom} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="body1" sx={{ minWidth: 80 }}>
+                  R$ {denom}
+                </Typography>
+                <TextField
+                  type="number"
+                  label="Quantidade"
+                  value={addFichaQuantities[denom]}
+                  onChange={(e) => setAddFichaQuantities({ ...addFichaQuantities, [denom]: e.target.value })}
+                  inputProps={{ min: 0, step: 1 }}
+                  size="small"
+                  sx={{ width: 120 }}
+                />
+              </Box>
+            ))}
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => {
             setAddFichaDialogOpen(false)
-            setAddFichaInput('')
+            setAddFichaQuantities({ 1: '', 2: '', 5: '', 10: '', 20: '' })
           }}>Cancelar</Button>
           <Button
             onClick={addFichaFromTransaction}
             variant="contained"
-            disabled={!addFichaInput || parseInt(addFichaInput) <= 0}
+            disabled={!DENOMINATIONS.some(d => addFichaQuantities[d] && parseInt(addFichaQuantities[d]) > 0)}
           >
             Adicionar
           </Button>
