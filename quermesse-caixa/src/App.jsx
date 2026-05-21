@@ -155,6 +155,32 @@ function App() {
     }
   }, [])
 
+  // Keyboard shortcuts for products
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Only trigger if in caixa tab and not typing in an input
+      if (currentTab !== 'caixa') return
+      if (
+        document.activeElement.tagName === 'INPUT' ||
+        document.activeElement.tagName === 'TEXTAREA'
+      ) return
+
+      const key = e.key.toLowerCase()
+
+      // Don't trigger for numbers
+      if (/^\d$/.test(key)) return
+
+      // Find product with matching shortcut
+      const product = products.find(p => p.shortcut && p.shortcut.toLowerCase() === key)
+      if (product) {
+        addToCart(product)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentTab, products])
+
   const saveSalesToStorage = (newSales) => {
     localStorage.setItem('quermesse-sales', JSON.stringify(newSales))
     setSales(newSales)
@@ -692,12 +718,21 @@ function App() {
                         <Typography variant="body2" color="text.secondary" gutterBottom>
                           {product.description}
                         </Typography>
-                        <Chip
-                          label={product.category}
-                          size="small"
-                          variant="outlined"
-                          sx={{ mt: 1 }}
-                        />
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                          <Chip
+                            label={product.category}
+                            size="small"
+                            variant="outlined"
+                          />
+                          {product.shortcut && (
+                            <Chip
+                              label={`[${product.shortcut.toUpperCase()}]`}
+                              size="small"
+                              color="primary"
+                              sx={{ ml: 1, fontWeight: 'bold' }}
+                            />
+                          )}
+                        </Box>
                       </CardContent>
                     </Card>
                   </Grid>
