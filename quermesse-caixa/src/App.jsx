@@ -594,21 +594,55 @@ function App() {
     let availableRemaining = remaining
 
     if (mode === 'privilegiar_troco') {
-      const preferred = [2, 3, 1, 5, 10, 20]
+      const preferred = [2, 3, 5, 1, 10, 20]
+      // First pass: use max 5 bills per denomination
       for (const denom of preferred) {
-        const count = Math.min(availableRemaining / (denom * 100), fichasCopy[denom])
+        const maxBills = 5
+        const count = Math.min(availableRemaining / (denom * 100), fichasCopy[denom], maxBills)
         availableResult[denom] = Math.floor(count)
         availableRemaining -= availableResult[denom] * denom * 100
         fichasCopy[denom] -= availableResult[denom]
+      }
+
+      // Second pass: if remaining, continue without the 5-bill limit
+      if (availableRemaining > 0) {
+        for (const denom of preferred) {
+          if (availableRemaining <= 0) break
+          const count = Math.min(availableRemaining / (denom * 100), fichasCopy[denom])
+          const additional = Math.floor(count)
+          if (additional > 0) {
+            availableResult[denom] += additional
+            availableRemaining -= additional * denom * 100
+            fichasCopy[denom] -= additional
+          }
+        }
       }
     } else {
       for (const denom of DENOMINATIONS) {
-        const count = Math.min(availableRemaining / (denom * 100), fichasCopy[denom])
+        const maxBills = 5
+        // First pass: use max 5 bills per denomination
+        const count = Math.min(availableRemaining / (denom * 100), fichasCopy[denom], maxBills)
         availableResult[denom] = Math.floor(count)
         availableRemaining -= availableResult[denom] * denom * 100
         fichasCopy[denom] -= availableResult[denom]
       }
+
+      // Second pass: if remaining, continue without the 5-bill limit
+      if (availableRemaining > 0) {
+        for (const denom of DENOMINATIONS) {
+          if (availableRemaining <= 0) break
+          const count = Math.min(availableRemaining / (denom * 100), fichasCopy[denom])
+          const additional = Math.floor(count)
+          if (additional > 0) {
+            availableResult[denom] += additional
+            availableRemaining -= additional * denom * 100
+            fichasCopy[denom] -= additional
+          }
+        }
+      }
     }
+
+    // Note: Limited to max 5 bills of each denomination in the above calculations
 
     // If exact change is possible with available fichas, use it
     if (availableRemaining === 0) {
@@ -623,16 +657,44 @@ function App() {
 
     if (mode === 'privilegiar_troco') {
       const preferred = [2, 3, 1, 5, 10, 20]
+      // First pass: use max 5 bills per denomination
       for (const denom of preferred) {
+        const maxBills = 5
         const count = Math.floor(remaining / (denom * 100))
-        idealResult[denom] = count
-        remaining -= count * denom * 100
+        const limitedCount = Math.min(count, maxBills)
+        idealResult[denom] = limitedCount
+        remaining -= limitedCount * denom * 100
+      }
+
+      // Second pass: if remaining, continue without the 5-bill limit
+      if (remaining > 0) {
+        for (const denom of preferred) {
+          const additional = Math.floor(remaining / (denom * 100))
+          if (additional > 0) {
+            idealResult[denom] += additional
+            remaining -= additional * denom * 100
+          }
+        }
       }
     } else {
+      // First pass: use max 5 bills per denomination
       for (const denom of DENOMINATIONS) {
+        const maxBills = 5
         const count = Math.floor(remaining / (denom * 100))
-        idealResult[denom] = count
-        remaining -= count * denom * 100
+        const limitedCount = Math.min(count, maxBills)
+        idealResult[denom] = limitedCount
+        remaining -= limitedCount * denom * 100
+      }
+
+      // Second pass: if remaining, continue without the 5-bill limit
+      if (remaining > 0) {
+        for (const denom of DENOMINATIONS) {
+          const additional = Math.floor(remaining / (denom * 100))
+          if (additional > 0) {
+            idealResult[denom] += additional
+            remaining -= additional * denom * 100
+          }
+        }
       }
     }
 
@@ -1734,7 +1796,13 @@ function App() {
                                       boxShadow: 6
                                     },
                                     background: 'linear-gradient(135deg, #8D6E63 0%, #6D4C41 100%)',
-                                    color: 'white'
+                                    color: 'white',
+                                    border: userData && userData.fichas && userData.transactions ?
+                                      `2px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '#f44336' : 'transparent'}` : 'transparent',
+                                    '&:focus': {
+                                      outline: userData && userData.fichas && userData.transactions ?
+                                        `2px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '#f44336' : 'transparent'}` : 'transparent'
+                                    }
                                   }}
                                   onClick={() => {
                                     const userSalesByDay = adminDataSinceBeginning
