@@ -59,7 +59,7 @@ import {
 import './App.css'
 
 const DENOMINATIONS = [20, 10, 5, 3, 2, 1]
-const API_BASE_URL = import.meta.env.DEV === true ? '/api' : 'https://vc7goabm1h.execute-api.us-east-1.amazonaws.com/prod'
+const API_BASE_URL = import.meta.env.DEV === true ? '/api' : 'https://y7zq0aigy7.execute-api.us-east-1.amazonaws.com/prod'
 
 function App() {
   const [products, setProducts] = useState([])
