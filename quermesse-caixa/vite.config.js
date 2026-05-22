@@ -7,4 +7,13 @@ export default defineConfig({
   build: {
     outDir: 'd',
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://vc7goabm1h.execute-api.us-east-1.amazonaws.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '/prod')
+      }
+    }
+  }
 })

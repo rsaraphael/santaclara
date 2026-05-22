@@ -35,7 +35,8 @@ import {
   Radio,
   RadioGroup,
   FormControl,
-  FormLabel
+  FormLabel,
+  CircularProgress
 } from '@mui/material'
 import {
   Add as AddIcon,
@@ -50,11 +51,15 @@ import {
   CheckCircle as CheckCircleIcon,
   Money as MoneyIcon,
   Refresh as RefreshIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  AdminPanelSettings as AdminIcon,
+  Lock as LockIcon,
+  Visibility as VisibilityIcon
 } from '@mui/icons-material'
 import './App.css'
 
-const DENOMINATIONS = [20, 10, 5, 2, 1]
+const DENOMINATIONS = [20, 10, 5, 3, 2, 1]
+const API_BASE_URL = import.meta.env.DEV ? '/api' : 'https://vc7goabm1h.execute-api.us-east-1.amazonaws.com'
 
 function App() {
   const [products, setProducts] = useState([])
@@ -78,7 +83,7 @@ function App() {
   const [fichasSuggestion, setFichasSuggestion] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [addFichaDialogOpen, setAddFichaDialogOpen] = useState(false)
-  const [addFichaQuantities, setAddFichaQuantities] = useState({ 1: '', 2: '', 5: '', 10: '', 20: '' })
+  const [addFichaQuantities, setAddFichaQuantities] = useState({ 1: '', 2: '', 3: '', 5: '', 10: '', 20: '' })
   const [addRealMoneyDialogOpen, setAddRealMoneyDialogOpen] = useState(false)
   const [addRealMoneyAmount, setAddRealMoneyAmount] = useState('')
   const [addRealMoneyType, setAddRealMoneyType] = useState('deposit')
@@ -90,6 +95,25 @@ function App() {
   const [tempQuantity, setTempQuantity] = useState('')
   const debounceTimeoutRef = useRef(null)
   const inputRefs = useRef({})
+
+  // Admin / API Integration states
+  const [userApiKey, setUserApiKey] = useState('')
+  const [userApiKeyExpiry, setUserApiKeyExpiry] = useState(null)
+  const [setApiKeyDialogOpen, setSetApiKeyDialogOpen] = useState(false)
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [adminAuthenticated, setAdminAuthenticated] = useState(false)
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminPasswordDialogOpen, setAdminPasswordDialogOpen] = useState(false)
+  const [adminData, setAdminData] = useState([])
+  const [adminDataSinceBeginning, setAdminDataSinceBeginning] = useState([])
+  const [selectedUserDetails, setSelectedUserDetails] = useState(null)
+  const [userDetailsDialogOpen, setUserDetailsDialogOpen] = useState(false)
+  const [daySalesDialogOpen, setDaySalesDialogOpen] = useState(false)
+  const [selectedDaySales, setSelectedDaySales] = useState(null)
+  const [loadingAdmin, setLoadingAdmin] = useState(false)
+  const [syncStatus, setSyncStatus] = useState('idle')
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [showAdminPassword, setShowAdminPassword] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -153,6 +177,20 @@ function App() {
     if (savedTransactions) {
       setTransactions(JSON.parse(savedTransactions))
     }
+    // Load API key with expiry check
+    const savedApiKey = localStorage.getItem('quermesse-api-key')
+    const savedApiKeyExpiry = localStorage.getItem('quermesse-api-key-expiry')
+    if (savedApiKey && savedApiKeyExpiry) {
+      const expiryTime = parseInt(savedApiKeyExpiry)
+      const now = Date.now()
+      if (now < expiryTime) {
+        setUserApiKey(savedApiKey)
+        setUserApiKeyExpiry(expiryTime)
+      } else {
+        localStorage.removeItem('quermesse-api-key')
+        localStorage.removeItem('quermesse-api-key-expiry')
+      }
+    }
   }, [])
 
   // Keyboard shortcuts for products
@@ -194,6 +232,202 @@ function App() {
   const saveTransactionsToStorage = (newTransactions) => {
     localStorage.setItem('quermesse-transactions', JSON.stringify(newTransactions))
     setTransactions(newTransactions)
+  }
+
+  // API Integration Functions
+  const syncToAPI = async () => {
+    if (!userApiKey) return
+
+    const today = new Date().toISOString().split('T')[0]
+
+    // Calculate transaction totals by type
+    const totalsByType = {
+      pix: sales.filter(s => s.paymentMethod === 'Pix').reduce((sum, s) => sum + s.total, 0),
+      cartao: sales.filter(s => s.paymentMethod === 'Cartão').reduce((sum, s) => sum + s.total, 0),
+      dinheiro: sales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0)
+    }
+
+    // Calculate fichas total from today's transactions only (not from current state)
+    let fichasTotal = 0
+    transactions.filter(t =>
+      t.type === 'ficha' &&
+      t.subType === 'entrada' &&
+      t.timestamp.startsWith(today)
+    ).forEach(transaction => {
+      fichasTotal += transaction.total || 0
+    })
+
+    const payload = {
+      date: today,
+      transactions: totalsByType,
+      fichas: fichasTotal
+    }
+
+    try {
+      setSyncStatus('syncing')
+      const response = await fetch(`${API_BASE_URL}/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': userApiKey
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (response.ok) {
+        setSyncStatus('success')
+      } else {
+        setSyncStatus('error')
+      }
+    } catch (error) {
+      console.error('Error syncing to API:', error)
+      setSyncStatus('error')
+    }
+  }
+
+  // Auto-sync every 3 minutes
+  useEffect(() => {
+    if (!userApiKey) return
+
+    const syncInterval = setInterval(() => {
+      syncToAPI()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, 3 * 60 * 1000) // 3 minutes
+
+    return () => clearInterval(syncInterval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userApiKey])
+
+  const fetchAdminData = async (date) => {
+    if (!adminPassword) return
+
+    try {
+      setLoadingAdmin(true)
+      const response = await fetch(`${API_BASE_URL}/transactions?day=${date}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': adminPassword
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAdminData(data.data || [])
+      } else {
+        console.error('Failed to fetch admin data')
+      }
+    } catch (error) {
+      console.error('Error fetching admin data:', error)
+    } finally {
+      setLoadingAdmin(false)
+    }
+  }
+
+  const fetchAllAdminData = async () => {
+    if (!adminPassword) return
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/transactions?sinceBeginning=true`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': adminPassword
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAdminDataSinceBeginning(data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching all admin data:', error)
+    }
+  }
+
+  // Track if we've fetched historical data
+  const [fetchedHistoricalData, setFetchedHistoricalData] = useState(false)
+
+  // Refresh squares every 3 minutes, fetch historical data only once when tab enters
+  useEffect(() => {
+    if (!adminAuthenticated) return
+
+    const today = new Date().toISOString().split('T')[0]
+
+    // Fetch today's data immediately
+    fetchAdminData(today)
+
+    // Fetch historical data only once
+    if (!fetchedHistoricalData) {
+      fetchAllAdminData()
+      setFetchedHistoricalData(true)
+    }
+
+    // Refresh only today's data every 3 minutes
+    const refreshInterval = setInterval(() => {
+      fetchAdminData(today)
+    }, 3 * 60 * 1000) // 3 minutes
+
+    return () => clearInterval(refreshInterval)
+  }, [adminAuthenticated, adminPassword, fetchedHistoricalData])
+
+  const setApiKey = (apiKey) => {
+    // Auto-append the suffix
+    const fullApiKey = `${apiKey}-quermesse-santa-clara`
+    const expiryTime = Date.now() + 8 * 60 * 60 * 1000 // 8 hours
+    localStorage.setItem('quermesse-api-key', fullApiKey)
+    localStorage.setItem('quermesse-api-key-expiry', expiryTime.toString())
+    setUserApiKey(fullApiKey)
+    setUserApiKeyExpiry(expiryTime)
+    setSetApiKeyDialogOpen(false)
+    setApiKeyInput('')
+  }
+
+  const clearApiKey = () => {
+    localStorage.removeItem('quermesse-api-key')
+    localStorage.removeItem('quermesse-api-key-expiry')
+    setUserApiKey('')
+    setUserApiKeyExpiry(null)
+  }
+
+  const getTotalByUser = (userId) => {
+    const userData = adminData.find(d => d.userId === userId)
+    if (!userData || !userData.transactions) return 0
+    return (userData.transactions.pix || 0) +
+           (userData.transactions.cartao || 0) +
+           (userData.transactions.dinheiro || 0)
+  }
+
+  const getUserDetails = (userId) => {
+    return adminData.find(d => d.userId === userId)
+  }
+
+  const getUniqueDates = () => {
+    const today = new Date().toISOString().split('T')[0]
+    const historicalDates = new Set(adminDataSinceBeginning.map(d => d.date))
+    // Add today if we have data for it
+    if (adminData.length > 0) {
+      historicalDates.add(today)
+    }
+    return Array.from(historicalDates).sort((a, b) => new Date(b) - new Date(a))
+  }
+
+  const getDayTotal = (dayData, userId) => {
+    const userData = dayData.find(d => d.userId === userId)
+    if (!userData || !userData.transactions) return 0
+    return (userData.transactions.pix || 0) +
+           (userData.transactions.cartao || 0) +
+           (userData.transactions.dinheiro || 0)
+  }
+
+  const getDayData = (date) => {
+    const today = new Date().toISOString().split('T')[0]
+    // For today, use adminData (updated every 3 min)
+    // For historical days, use adminDataSinceBeginning (fetched once)
+    if (date === today && adminData.length > 0) {
+      return adminData
+    }
+    return adminDataSinceBeginning.filter(d => d.date === date)
   }
 
   const addFichaFromTransaction = () => {
@@ -360,7 +594,7 @@ function App() {
     let availableRemaining = remaining
 
     if (mode === 'privilegiar_troco') {
-      const preferred = [5, 2, 10, 20, 1]
+      const preferred = [2, 3, 1, 5, 10, 20]
       for (const denom of preferred) {
         const count = Math.min(availableRemaining / (denom * 100), fichasCopy[denom])
         availableResult[denom] = Math.floor(count)
@@ -388,7 +622,7 @@ function App() {
     const idealResult = { 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 }
 
     if (mode === 'privilegiar_troco') {
-      const preferred = [5, 2, 10, 20, 1]
+      const preferred = [2, 3, 1, 5, 10, 20]
       for (const denom of preferred) {
         const count = Math.floor(remaining / (denom * 100))
         idealResult[denom] = count
@@ -632,16 +866,56 @@ function App() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Quermesse Caixa
           </Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            color="inherit"
-            onClick={() => setConfirmClearDialogOpen(true)}
-            startIcon={<RefreshIcon />}
-            sx={{ borderColor: 'rgba(255,255,255,0.3)', '&:hover': { borderColor: 'white' } }}
-          >
-            Novo Dia
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {userApiKey && (
+              <>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 1 }}>
+                  <Chip
+                    label={userApiKey.slice(0, 15) + '...'}
+                    size="small"
+                    color="success"
+                    icon={<CheckCircleIcon />}
+                    onDelete={clearApiKey}
+                  />
+                  <Chip
+                    label={syncStatus === 'syncing' ? 'Sincronizando...' : syncStatus === 'error' ? 'Erro' : 'Sincronizado'}
+                    size="small"
+                    color={syncStatus === 'syncing' ? 'warning' : syncStatus === 'error' ? 'error' : 'success'}
+                  />
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="inherit"
+                  onClick={syncToAPI}
+                  startIcon={<RefreshIcon />}
+                  sx={{ borderColor: 'rgba(255,255,255,0.3)', '&:hover': { borderColor: 'white' } }}
+                >
+                  Sincronizar
+                </Button>
+              </>
+            )}
+            <Button
+              variant="outlined"
+              size="small"
+              color="inherit"
+              onClick={() => setSetApiKeyDialogOpen(true)}
+              startIcon={<LockIcon />}
+              sx={{ borderColor: 'rgba(255,255,255,0.3)', '&:hover': { borderColor: 'white' } }}
+            >
+              {userApiKey ? 'Login' : 'Login'}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              color="inherit"
+              onClick={() => setConfirmClearDialogOpen(true)}
+              startIcon={<RefreshIcon />}
+              sx={{ borderColor: 'rgba(255,255,255,0.3)', '&:hover': { borderColor: 'white' } }}
+            >
+              Novo Dia
+            </Button>
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -689,6 +963,15 @@ function App() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <AccountBalanceIcon />
                   Fichas
+                </Box>
+              }
+            />
+            <Tab
+              value="admin"
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <AdminIcon />
+                  Admin
                 </Box>
               }
             />
@@ -1335,7 +1618,6 @@ function App() {
                       height: 50,
                       bgcolor: denom >= 10 ? '#A1887F' : denom >= 5 ? '#BCAAA4' : '#D7CCC8',
                       color: denom >= 10 ? 'white' : '#3E2723',
-                      color: 'white',
                       borderRadius: 2,
                       display: 'flex',
                       alignItems: 'center',
@@ -1347,6 +1629,242 @@ function App() {
                     </Box>
                   </Box>
                 ))}
+              </Paper>
+            </Grid>
+          </Grid>
+        ) : currentTab === 'admin' ? (
+          /* Admin Panel */
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h5" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <AdminIcon />
+                  Painel Administrativo
+                </Typography>
+
+                {!adminAuthenticated ? (
+                  <Box sx={{ textAlign: 'center', py: 8 }}>
+                    <LockIcon sx={{ fontSize: 64, mb: 2, color: 'text.secondary' }} />
+                    <Typography variant="h6" gutterBottom>Área Restrita</Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Digite a senha de administrador para acessar
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      startIcon={<LockIcon />}
+                      onClick={() => setAdminPasswordDialogOpen(true)}
+                      sx={{ mt: 2 }}
+                    >
+                      Entrar com Senha
+                    </Button>
+                  </Box>
+                ) : (
+                  <>
+                    {loadingAdmin ? (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                        <CircularProgress />
+                      </Box>
+                    ) : (
+                      <>
+                        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              Dados de {new Date().toISOString().split('T')[0].split('-').reverse().join('/')}
+                            </Typography>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => {
+                                // Clear existing data and refetch everything
+                                fetchAdminData(new Date().toISOString().split('T')[0])
+                                fetchAllAdminData()
+                              }}
+                              startIcon={<RefreshIcon />}
+                              color="primary"
+                            >
+                            </Button>
+                          </Box>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setAdminAuthenticated(false)}
+                            color="error"
+                          >
+                            Sair
+                          </Button>
+                        </Box>
+
+                        {/* Grand Total */}
+                        {adminData.length > 0 && (
+                          <Box sx={{ mb: 4, textAlign: 'center' }}>
+                            <Paper sx={{
+                              p: 3,
+                              bgcolor: '#3E2723',
+                              color: 'white',
+                              display: 'inline-block',
+                              minWidth: 320,
+                              boxShadow: 4
+                            }}>
+                              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                Total Geral das Vendas
+                              </Typography>
+                              <Typography variant="h4" sx={{ fontWeight: 'bold', mt: 1 }}>
+                                R$ {adminData.reduce((sum, d) => {
+                                  const t = d.transactions || {}
+                                  return sum + (t.pix || 0) + (t.cartao || 0) + (t.dinheiro || 0)
+                                }, 0).toFixed(2)}
+                              </Typography>
+                            </Paper>
+                          </Box>
+                        )}
+
+                        {/* User Cards */}
+                        <Grid container spacing={3} justifyContent="center">
+                          {['CAIXA_A', 'CAIXA_B', 'CAIXA_C'].map(userId => {
+                            const total = getTotalByUser(userId)
+                            const userData = getUserDetails(userId)
+                            return (
+                              <Grid item xs={12} sm={4} md={3} key={userId}>
+                                <Card
+                                  sx={{
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s',
+                                    '&:hover': {
+                                      transform: 'translateY(-4px)',
+                                      boxShadow: 6
+                                    },
+                                    background: 'linear-gradient(135deg, #8D6E63 0%, #6D4C41 100%)',
+                                    color: 'white'
+                                  }}
+                                  onClick={() => {
+                                    const userSalesByDay = adminDataSinceBeginning
+                                      .filter(d => d.userId === userId)
+                                      .sort((a, b) => new Date(b.date) - new Date(a.date))
+                                    setSelectedDaySales(userSalesByDay)
+                                    setDaySalesDialogOpen(true)
+                                  }}
+                                >
+                                  <CardContent sx={{ textAlign: 'center' }}>
+                                    <Typography variant="h4" gutterBottom>
+                                      {userId.replace('_', ' ')}
+                                    </Typography>
+                                    <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.3)' }} />
+                                    <Typography variant="body2" sx={{ mb: 1, opacity: 0.9 }}>
+                                      Total de Vendas
+                                    </Typography>
+                                    <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
+                                      R$ {total.toFixed(2)}
+                                    </Typography>
+                                    {userData && userData.transactions && (
+                                      <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5, opacity: 0.9 }}>
+                                        <Typography variant="caption">
+                                          Pix: R$ {(userData.transactions.pix || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption">
+                                          Cartão: R$ {(userData.transactions.cartao || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption">
+                                          Dinheiro: R$ {(userData.transactions.dinheiro || 0).toFixed(2)}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                    {userData && userData.fichas && (
+                                      <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5, opacity: 0.9 }}>
+                                        <Typography variant="caption">
+                                          Fichas Total: R$ {(userData.fichas || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption">
+                                          Fichas Ainda No Caixa: R$ {Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))).toFixed(2)}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              </Grid>
+                            )
+                          })}
+                        </Grid>
+
+                        {/* Daily Sales List */}
+                        <Box sx={{ mt: 4 }}>
+                          <Typography variant="h6" gutterBottom>Vendas por Dia</Typography>
+                          {getUniqueDates().length === 0 ? (
+                            <Typography variant="body2" color="text.secondary">
+                              Nenhum dado disponível
+                            </Typography>
+                          ) : (
+                            <TableContainer component={Paper}>
+                              <Table>
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell>Data</TableCell>
+                                    <TableCell align="right">CAIXA A</TableCell>
+                                    <TableCell align="right">CAIXA B</TableCell>
+                                    <TableCell align="right">CAIXA C</TableCell>
+                                    <TableCell align="right">Total</TableCell>
+                                    {/* <TableCell align="right">Fichas</TableCell> */}
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {getUniqueDates().map(date => {
+                                    const dayData = getDayData(date)
+                                    const totalA = getDayTotal(dayData, 'CAIXA_A')
+                                    const totalB = getDayTotal(dayData, 'CAIXA_B')
+                                    const totalC = getDayTotal(dayData, 'CAIXA_C')
+                                    const grandTotal = totalA + totalB + totalC
+                                    return (
+                                      <TableRow
+                                        key={date}
+                                        hover
+                                        sx={{ cursor: 'pointer' }}
+                                        onClick={() => {
+                                          setSelectedDaySales(dayData)
+                                          setDaySalesDialogOpen(true)
+                                        }}
+                                      >
+                                        <TableCell>
+                                          {date.split('-').reverse().join('/')}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {totalA > 0 ? `R$ ${totalA.toFixed(2)}` : '-'}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {totalB > 0 ? `R$ ${totalB.toFixed(2)}` : '-'}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {totalC > 0 ? `R$ ${totalC.toFixed(2)}` : '-'}
+                                        </TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>
+                                          R$ {grandTotal.toFixed(2)}
+                                        </TableCell>
+                                        {/* <TableCell align="right">
+                                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                            <Typography variant="body2">
+                                              CAIXA A: R$ {adminDataSinceBeginning.filter(d => d.date === date && d.userId === 'CAIXA_A')[0]?.fichas || 0}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                              CAIXA B: R$ {adminDataSinceBeginning.filter(d => d.date === date && d.userId === 'CAIXA_B')[0]?.fichas || 0}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                              CAIXA C: R$ {adminDataSinceBeginning.filter(d => d.date === date && d.userId === 'CAIXA_C')[0]?.fichas || 0}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                              No Caixa: R$ {Math.max(0, (adminDataSinceBeginning.filter(d => d.date === date).reduce((sum, d) => sum + (d.fichas || 0), 0) - grandTotal)).toFixed(2)}
+                                            </Typography>
+                                          </Box>
+                                        </TableCell> */}
+                                      </TableRow>
+                                    )
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          )}
+                        </Box>
+                      </>
+                    )}
+                  </>
+                )}
               </Paper>
             </Grid>
           </Grid>
@@ -1610,6 +2128,11 @@ function App() {
             setSales([])
             setTransactions([])
             setFichas({ 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 })
+            // Clear API keys
+            localStorage.removeItem('quermesse-api-key')
+            localStorage.removeItem('quermesse-api-key-expiry')
+            setUserApiKey('')
+            setUserApiKeyExpiry(null)
             localStorage.removeItem('quermesse-sales')
             localStorage.removeItem('quermesse-transactions')
             localStorage.removeItem('quermesse-fichas')
@@ -1787,6 +2310,264 @@ function App() {
           >
             {addRealMoneyType === 'deposit' ? 'Registrar Entrada' : 'Registrar Saída'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Set API Key Dialog */}
+      <Dialog open={setApiKeyDialogOpen} onClose={() => {
+        setSetApiKeyDialogOpen(false)
+        setApiKeyInput('')
+        setShowApiKey(false)
+      }} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LockIcon color="primary" />
+            Login
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Insira sua API Key para sincronizar dados com o servidor.
+            A chave expirará automaticamente após 8 horas.
+          </Typography>
+          <TextField
+            fullWidth
+            label="API Key"
+            type={showApiKey ? 'text' : 'password'}
+            value={apiKeyInput}
+            onChange={(e) => setApiKeyInput(e.target.value)}
+            autoFocus
+            sx={{ mt: 2 }}
+            InputProps={{
+              endAdornment: (
+                <IconButton
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  edge="end"
+                  tabIndex={-1}
+                >
+                  <VisibilityIcon />
+                </IconButton>
+              )
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setSetApiKeyDialogOpen(false)
+            setApiKeyInput('')
+          }}>Cancelar</Button>
+          <Button
+            onClick={() => setApiKey(apiKeyInput)}
+            variant="contained"
+            disabled={!apiKeyInput}
+            color="success"
+          >
+            Salvar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Admin Password Dialog */}
+      <Dialog open={adminPasswordDialogOpen} onClose={() => {
+        setAdminPasswordDialogOpen(false)
+        setAdminPassword('')
+        setShowAdminPassword(false)
+      }} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LockIcon color="primary" />
+            Área Restrita
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Digite a senha de administrador para acessar o painel.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Senha"
+            type={showApiKey ? 'text' : 'password'}
+            value={adminPassword}
+            onChange={(e) => setAdminPassword(e.target.value)}
+            autoFocus
+            sx={{ mt: 2 }}
+            InputProps={{
+              endAdornment: (
+                <IconButton
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  edge="end"
+                  tabIndex={-1}
+                >
+                  <VisibilityIcon />
+                </IconButton>
+              )
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setAdminPasswordDialogOpen(false)
+            setAdminPassword('')
+          }}>Cancelar</Button>
+          <Button
+            onClick={() => {
+              // Auto-append the suffix for admin password
+              setAdminPassword(`${adminPassword}-quermesse-santa-clara`)
+              setAdminAuthenticated(true)
+              setAdminPasswordDialogOpen(false)
+            }}
+            variant="contained"
+            disabled={!adminPassword}
+            color="primary"
+          >
+            Entrar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Day Sales Dialog */}
+      <Dialog
+        open={daySalesDialogOpen}
+        onClose={() => {
+          setDaySalesDialogOpen(false)
+          setSelectedDaySales(null)
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <VisibilityIcon color="primary" />
+            Vendas por Dia
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedDaySales && selectedDaySales.length > 0 ? (
+            <>
+              {selectedDaySales.length === 1 ? (
+                /* Single day, single user - show breakdown by type */
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Paper sx={{ p: 2, bgcolor: 'grey.50', mb: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Caixa: {selectedDaySales[0].userId.replace('_', ' ')}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Data: {selectedDaySales[0].date.split('-').reverse().join('/')}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Última atualização: {new Date(selectedDaySales[0].updatedAt).toLocaleString('pt-BR')}
+                      </Typography>
+                      {selectedDaySales[0].fichas && (
+                        <Typography variant="body2" color="text.secondary">
+                          Fichas Total: R$ {(selectedDaySales[0].fichas || 0).toFixed(2)}
+                        </Typography>
+                      )}
+                      {selectedDaySales[0].fichas && (
+                        <Typography variant="body2" color="text.secondary">
+                          Fichas Ainda No Caixa: R$ {Math.max(0, (selectedDaySales[0].fichas || 0) - ((selectedDaySales[0].transactions?.dinheiro || 0) + (selectedDaySales[0].transactions?.cartao || 0) + (selectedDaySales[0].transactions?.pix || 0))).toFixed(2)}
+                        </Typography>
+                      )}
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="h6" gutterBottom>Vendas por Tipo</Typography>
+                    <Grid container spacing={2}>
+                      {[
+                        { key: 'pix', label: 'Pix', color: '#4CAF50' },
+                        { key: 'cartao', label: 'Cartão', color: '#2196F3' },
+                        { key: 'dinheiro', label: 'Dinheiro', color: '#FF9800' }
+                      ].map(({ key, label, color }) => (
+                        <Grid item xs={4} key={key}>
+                          <Paper sx={{ p: 2, bgcolor: color, color: 'white', textAlign: 'center' }}>
+                            <Typography variant="body2">{label}</Typography>
+                            <Typography variant="h5">
+                              R$ {(selectedDaySales[0].transactions?.[key] || 0).toFixed(2)}
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Paper sx={{ p: 3, bgcolor: '#8D6E63', color: 'white', textAlign: 'center', mt: 2 }}>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Total do Dia
+                      </Typography>
+                      <Typography variant="h4">
+                        R$ {((selectedDaySales[0].transactions?.pix || 0) +
+                               (selectedDaySales[0].transactions?.cartao || 0) +
+                               (selectedDaySales[0].transactions?.dinheiro || 0)).toFixed(2)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              ) : (
+                /* Multiple users for the same day - show all breakdowns */
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Paper sx={{ p: 2, bgcolor: 'grey.50', mb: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Data: {selectedDaySales[0].date.split('-').reverse().join('/')}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  {selectedDaySales.map(userData => (
+                    <Grid item xs={12} key={`${userData.userId}-${userData.date}`}>
+                      <Paper sx={{ p: 2 }}>
+                        <Typography variant="h6" gutterBottom>
+                          {userData.userId.replace('_', ' ')}
+                        </Typography>
+                        <Grid container spacing={2}>
+                          {[
+                            { key: 'pix', label: 'Pix', color: '#4CAF50' },
+                            { key: 'cartao', label: 'Cartão', color: '#2196F3' },
+                            { key: 'dinheiro', label: 'Dinheiro', color: '#FF9800' }
+                          ].map(({ key, label, color }) => (
+                            <Grid item xs={4} key={key}>
+                              <Box sx={{ textAlign: 'center', p: 1, bgcolor: color, borderRadius: 1, color: 'white' }}>
+                                <Typography variant="caption">{label}</Typography>
+                                <Typography variant="h6">
+                                  R$ {(userData.transactions?.[key] || 0).toFixed(2)}
+                                </Typography>
+                              </Box>
+                            </Grid>
+                          ))}
+                        </Grid>
+                        <Divider sx={{ my: 1 }} />
+                        <Typography variant="body2" align="right">
+                          Total: R$ {((userData.transactions?.pix || 0) +
+                                     (userData.transactions?.cartao || 0) +
+                                     (userData.transactions?.dinheiro || 0)).toFixed(2)}
+                        </Typography>
+                        {userData.fichas && (
+                          <Typography variant="body2" align="right" sx={{ mt: 1 }}>
+                            Fichas Total: R$ {(userData.fichas || 0).toFixed(2)}
+                          </Typography>
+                        )}
+                        {userData.fichas && (
+                          <Typography variant="body2" align="right" sx={{ mt: 1, color: 'text.secondary' }}>
+                            Fichas Ainda No Caixa: R$ {Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))).toFixed(2)}
+                          </Typography>
+                        )}
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </>
+          ) : (
+            <Typography>Nenhum dado disponível</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setDaySalesDialogOpen(false)
+            setSelectedDaySales(null)
+          }}>Fechar</Button>
         </DialogActions>
       </Dialog>
     </div>
