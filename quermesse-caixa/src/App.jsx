@@ -1204,19 +1204,7 @@ function App() {
                 ))}
               </Grid>
 
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  {categories.map(category => (
-                    <Chip
-                      key={category}
-                      label={category}
-                      onClick={() => setSelectedCategory(category)}
-                      color={selectedCategory === category ? 'primary' : 'default'}
-                      sx={{ cursor: 'pointer' }}
-                    />
-                  ))}
-                </Box>
-
+              <Box sx={{ mt: 3 }}>
                 <FormControl component="fieldset">
                   <FormLabel component="legend" sx={{ fontSize: '0.75rem' }}>Modo das Fichas</FormLabel>
                   <RadioGroup
@@ -1242,6 +1230,17 @@ function App() {
 
             {/* Cart Panel */}
             <Grid item xs={12} md={4}>
+              <Box sx={{ mb: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {categories.map(category => (
+                  <Chip
+                    key={category}
+                    label={category}
+                    onClick={() => setSelectedCategory(category)}
+                    color={selectedCategory === category ? 'primary' : 'default'}
+                    sx={{ cursor: 'pointer' }}
+                  />
+                ))}
+              </Box>
               <Paper className="cart-paper" elevation={3} sx={{ position: 'sticky', top: 80 }}>
                 <Box sx={{ p: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
