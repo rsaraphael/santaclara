@@ -138,3 +138,19 @@ body {
 .change-chip {
   margin: 4px;
 }
+
+/* Pulse animation for low fichas warning */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

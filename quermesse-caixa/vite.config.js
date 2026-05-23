@@ -10,7 +10,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://vc7goabm1h.execute-api.us-east-1.amazonaws.com',
+        target: 'https://y7zq0aigy7.execute-api.us-east-1.amazonaws.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '/prod')
       }

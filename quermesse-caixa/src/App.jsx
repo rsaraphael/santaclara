@@ -61,6 +61,44 @@ import './App.css'
 const DENOMINATIONS = [20, 10, 5, 3, 2, 1]
 const API_BASE_URL = import.meta.env.DEV === true ? '/api' : 'https://y7zq0aigy7.execute-api.us-east-1.amazonaws.com/prod'
 
+// Helper functions to handle dates in GMT-3 timezone
+const getDateGMT3 = () => {
+  const now = new Date()
+  // Convert to GMT-3 (Brazil time)
+  const offset = -3 // GMT-3
+  const gmt3Time = new Date(now.getTime() + (offset * 60 * 60 * 1000))
+  const year = gmt3Time.getUTCFullYear()
+  const month = String(gmt3Time.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(gmt3Time.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getTimestampGMT3 = () => {
+  const now = new Date()
+  // Convert to GMT-3 (Brazil time)
+  const offset = -3 // GMT-3
+  const gmt3Time = new Date(now.getTime() + (offset * 60 * 60 * 1000))
+  const year = gmt3Time.getUTCFullYear()
+  const month = String(gmt3Time.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(gmt3Time.getUTCDate()).padStart(2, '0')
+  const hours = String(gmt3Time.getUTCHours()).padStart(2, '0')
+  const minutes = String(gmt3Time.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(gmt3Time.getUTCSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}Z`
+}
+
+// Format date from server (already in GMT-3) to display format
+const formatGMT3DateTime = (isoString) => {
+  const date = new Date(isoString)
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 function App() {
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
@@ -234,11 +272,115 @@ function App() {
     setTransactions(newTransactions)
   }
 
-  // API Integration Functions
+  
+  // Auto-sync every 3 minutes
+  useEffect(() => {
+    if (!userApiKey) return
+
+    const syncToAPIWithCurrentData = async () => {
+      const today = getDateGMT3()
+
+      // Calculate transaction totals by type using current sales
+      const totalsByType = {
+        pix: sales.filter(s => s.paymentMethod === 'Pix').reduce((sum, s) => sum + s.total, 0),
+        cartao: sales.filter(s => s.paymentMethod === 'Cartão').reduce((sum, s) => sum + s.total, 0),
+        dinheiro: sales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0)
+      }
+
+      // Calculate total sales
+      const totalSales = totalsByType.pix + totalsByType.cartao + totalsByType.dinheiro
+
+      // Calculate fichas total from:
+      // 1. Today's manual fichas entries (transactions)
+      let manualFichasTotal = 0
+      transactions.filter(t =>
+        t.type === 'ficha' &&
+        t.subType === 'entrada' &&
+        t.timestamp.startsWith(today)
+      ).forEach(transaction => {
+        manualFichasTotal += transaction.total || 0
+      })
+
+      // 2. Fichas given in all sales today
+      let salesFichasTotal = 0
+      sales.filter(s => s.timestamp.startsWith(today)).forEach(sale => {
+        if (sale.fichasGiven) {
+          Object.entries(sale.fichasGiven).forEach(([denom, count]) => {
+            salesFichasTotal += parseInt(denom) * count
+          })
+        }
+      })
+
+      // const fichasTotal = manualFichasTotal + salesFichasTotal
+
+      const payload = {
+        date: today,
+        transactions: totalsByType,
+        fichas: manualFichasTotal
+      }
+
+      try {
+        setSyncStatus('syncing')
+        const response = await fetch(`${API_BASE_URL}/transactions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': userApiKey
+          },
+          body: JSON.stringify(payload)
+        })
+
+        if (response.ok) {
+          setSyncStatus('success')
+        } else {
+          setSyncStatus('error')
+        }
+      } catch (error) {
+        console.error('Error syncing to API:', error)
+        setSyncStatus('error')
+      }
+    }
+
+    const syncInterval = setInterval(() => {
+      syncToAPIWithCurrentData()
+    }, 3 * 60 * 1000) // 3 minutes
+
+    // Also sync immediately
+    syncToAPIWithCurrentData()
+
+    return () => clearInterval(syncInterval)
+  }, [userApiKey, sales, transactions])
+
+  const fetchAdminData = async (date) => {
+    if (!adminPassword) return
+
+    try {
+      setLoadingAdmin(true)
+      const response = await fetch(`${API_BASE_URL}/transactions?day=${date}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': adminPassword
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAdminData(data.data || [])
+      } else {
+        console.error('Failed to fetch admin data')
+      }
+    } catch (error) {
+      console.error('Error fetching admin data:', error)
+    } finally {
+      setLoadingAdmin(false)
+    }
+  }
+
   const syncToAPI = async () => {
     if (!userApiKey) return
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = getDateGMT3()
 
     // Calculate transaction totals by type
     const totalsByType = {
@@ -247,15 +389,31 @@ function App() {
       dinheiro: sales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0)
     }
 
-    // Calculate fichas total from today's transactions only (not from current state)
-    let fichasTotal = 0
+    // Calculate total sales
+    const totalSales = totalsByType.pix + totalsByType.cartao + totalsByType.dinheiro
+
+    // Calculate fichas total from:
+    // 1. Today's manual fichas entries (transactions)
+    let manualFichasTotal = 0
     transactions.filter(t =>
       t.type === 'ficha' &&
       t.subType === 'entrada' &&
       t.timestamp.startsWith(today)
     ).forEach(transaction => {
-      fichasTotal += transaction.total || 0
+      manualFichasTotal += transaction.total || 0
     })
+
+    // 2. Fichas given in all sales today
+    let salesFichasTotal = 0
+    sales.filter(s => s.timestamp.startsWith(today)).forEach(sale => {
+      if (sale.fichasGiven) {
+        Object.entries(sale.fichasGiven).forEach(([denom, count]) => {
+          salesFichasTotal += parseInt(denom) * count
+        })
+      }
+    })
+
+    const fichasTotal = manualFichasTotal + salesFichasTotal
 
     const payload = {
       date: today,
@@ -282,45 +440,6 @@ function App() {
     } catch (error) {
       console.error('Error syncing to API:', error)
       setSyncStatus('error')
-    }
-  }
-
-  // Auto-sync every 3 minutes
-  useEffect(() => {
-    if (!userApiKey) return
-
-    const syncInterval = setInterval(() => {
-      syncToAPI()
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, 3 * 60 * 1000) // 3 minutes
-
-    return () => clearInterval(syncInterval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userApiKey])
-
-  const fetchAdminData = async (date) => {
-    if (!adminPassword) return
-
-    try {
-      setLoadingAdmin(true)
-      const response = await fetch(`${API_BASE_URL}/transactions?day=${date}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': adminPassword
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setAdminData(data.data || [])
-      } else {
-        console.error('Failed to fetch admin data')
-      }
-    } catch (error) {
-      console.error('Error fetching admin data:', error)
-    } finally {
-      setLoadingAdmin(false)
     }
   }
 
@@ -352,7 +471,7 @@ function App() {
   useEffect(() => {
     if (!adminAuthenticated) return
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = getDateGMT3()
 
     // Fetch today's data immediately
     fetchAdminData(today)
@@ -403,7 +522,7 @@ function App() {
   }
 
   const getUniqueDates = () => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getDateGMT3()
     const historicalDates = new Set(adminDataSinceBeginning.map(d => d.date))
     // Add today if we have data for it
     if (adminData.length > 0) {
@@ -421,7 +540,7 @@ function App() {
   }
 
   const getDayData = (date) => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getDateGMT3()
     // For today, use adminData (updated every 3 min)
     // For historical days, use adminDataSinceBeginning (fetched once)
     if (date === today && adminData.length > 0) {
@@ -453,7 +572,7 @@ function App() {
 
       const transaction = {
         id: Date.now(),
-        timestamp: new Date().toISOString(),
+        timestamp: getTimestampGMT3(),
         type: 'ficha',
         subType: 'entrada',
         description: entries.join(', '),
@@ -473,7 +592,7 @@ function App() {
     if (amount > 0) {
       const transaction = {
         id: Date.now(),
-        timestamp: new Date().toISOString(),
+        timestamp: getTimestampGMT3(),
         type: 'real',
         subType: addRealMoneyType,
         amount
@@ -767,7 +886,7 @@ function App() {
 
     const sale = {
       id: Date.now(),
-      timestamp: new Date().toISOString(),
+      timestamp: getTimestampGMT3(),
       items: [...cart],
       total,
       paymentMethod: selectedPaymentMethod,
@@ -794,7 +913,7 @@ function App() {
 
     const sale = {
       id: Date.now(),
-      timestamp: new Date().toISOString(),
+      timestamp: getTimestampGMT3(),
       items: [...cart],
       total,
       paymentMethod: 'Dinheiro',
@@ -896,14 +1015,15 @@ function App() {
     dinheiro: sales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0)
   }
 
-  const formatDateTime = (isoString) => {
+  const formatGMT3DateTime = (isoString) => {
     const date = new Date(isoString)
     return date.toLocaleString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'UTC' // Use UTC to avoid timezone conversion
     })
   }
 
@@ -1256,17 +1376,21 @@ function App() {
             {lowFichasWarnings.length > 0 && (
               <Grid item xs={12}>
                 <Box sx={{
-                  p: 1,
-                  bgcolor: '#EFEBE9',
-                  color: '#5D4037',
-                  borderRadius: 1,
-                  fontSize: '0.8rem',
+                  p: 2,
+                  bgcolor: '#ffebee',
+                  color: '#b71c1c',
+                  borderRadius: 2,
+                  fontSize: '0.9rem',
+                  fontWeight: 'bold',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1
+                  gap: 1,
+                  border: '2px solid #d32f2f',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                  animation: 'pulse 2s infinite'
                 }}>
-                  <WarningIcon sx={{ fontSize: '1rem' }} />
-                  <span>Fichas acabando: {lowFichasWarnings.map(d => `R$ ${d} (${fichas[d]})`).join(', ')}</span>
+                  <WarningIcon sx={{ fontSize: '1.5rem', color: '#d32f2f' }} />
+                  <span>FICHAS ACABANDO: {lowFichasWarnings.map(d => `R$ ${d} (${fichas[d]})`).join(', ')}</span>
                 </Box>
               </Grid>
             )}
@@ -1356,7 +1480,7 @@ function App() {
                         <TableBody>
                           {filteredSales.map((sale) => (
                             <TableRow key={sale.id} hover>
-                              <TableCell>{formatDateTime(sale.timestamp)}</TableCell>
+                              <TableCell>{formatGMT3DateTime(sale.timestamp)}</TableCell>
                               <TableCell>
                                 <Chip
                                   label={sale.paymentMethod}
@@ -1512,7 +1636,7 @@ function App() {
                         <TableBody>
                           {[...transactions].reverse().map((transaction) => (
                             <TableRow key={transaction.id} hover>
-                              <TableCell>{formatDateTime(transaction.timestamp)}</TableCell>
+                              <TableCell>{formatGMT3DateTime(transaction.timestamp)}</TableCell>
                               <TableCell>
                                 {transaction.type === 'ficha' ? (
                                   <Chip label="Ficha" color="info" size="small" />
@@ -1731,14 +1855,14 @@ function App() {
                         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Typography variant="body2" color="text.secondary">
-                              Dados de {new Date().toISOString().split('T')[0].split('-').reverse().join('/')}
+                              Dados de {getDateGMT3().split('-').reverse().join('/')}
                             </Typography>
                             <Button
                               size="small"
                               variant="outlined"
                               onClick={() => {
                                 // Clear existing data and refetch everything
-                                fetchAdminData(new Date().toISOString().split('T')[0])
+                                fetchAdminData(getDateGMT3())
                                 fetchAllAdminData()
                               }}
                               startIcon={<RefreshIcon />}
@@ -1798,10 +1922,12 @@ function App() {
                                     background: 'linear-gradient(135deg, #8D6E63 0%, #6D4C41 100%)',
                                     color: 'white',
                                     border: userData && userData.fichas && userData.transactions ?
-                                      `2px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '#f44336' : 'transparent'}` : 'transparent',
+                                      `4px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '#ff0000' : 'transparent'}` : 'transparent',
+                                    boxShadow: userData && userData.fichas && userData.transactions ?
+                                      Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '0 0 20px rgba(255, 0, 0, 0.5)' : 'none' : 'none',
                                     '&:focus': {
                                       outline: userData && userData.fichas && userData.transactions ?
-                                        `2px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '#f44336' : 'transparent'}` : 'transparent'
+                                        `4px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '#ff0000' : 'transparent'}` : 'transparent'
                                     }
                                   }}
                                   onClick={() => {
@@ -2226,7 +2352,7 @@ function App() {
           {saleToDelete && (
             <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
               <Typography variant="body2">
-                <strong>Data:</strong> {formatDateTime(saleToDelete.timestamp)}
+                <strong>Data:</strong> {formatGMT3DateTime(saleToDelete.timestamp)}
               </Typography>
               <Typography variant="body2">
                 <strong>Total:</strong> R$ {saleToDelete.total.toFixed(2)}
@@ -2257,7 +2383,7 @@ function App() {
           {saleToEdit && (
             <>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Data: {formatDateTime(saleToEdit.timestamp)}
+                Data: {formatGMT3DateTime(saleToEdit.timestamp)}
               </Typography>
               <TextField
                 fullWidth
@@ -2524,7 +2650,7 @@ function App() {
                         Data: {selectedDaySales[0].date.split('-').reverse().join('/')}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Última atualização: {new Date(selectedDaySales[0].updatedAt).toLocaleString('pt-BR')}
+                        Última atualização: {formatGMT3DateTime(selectedDaySales[0].updatedAt)}
                       </Typography>
                       {selectedDaySales[0].fichas && (
                         <Typography variant="body2" color="text.secondary">
