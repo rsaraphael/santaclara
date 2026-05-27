@@ -160,6 +160,15 @@
       "adultsOnly": false,
       "enabled": true,
       "additionalItemsGroups": []
+    },
+    {
+      "id": 18,
+      "name": "Coca-cola 600ml",
+      "description": "Zero ou Normal",
+      "price": 1000,
+      "adultsOnly": false,
+      "enabled": true,
+      "additionalItemsGroups": []
     }
   ]}],
     "company": {

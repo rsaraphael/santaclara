@@ -41,8 +41,8 @@
   },
   {
     "id": 6,
-    "name": "Refrigerante",
-    "description": "Coca, Coca Zero, Guaraná, Guaraná Zero",
+    "name": "Refrigerante ou Suco Tropical",
+    "description": "",
     "price": 8.00,
     "category": "Bebidas",
     "shortcut": "r"
@@ -97,14 +97,6 @@
   },
   {
     "id": 13,
-    "name": "Suco Tropical",
-    "description": "",
-    "price": 8.00,
-    "category": "Bebidas",
-    "shortcut": "t"
-  },
-  {
-    "id": 14,
     "name": "Água",
     "description": "",
     "price": 3.00,
@@ -112,7 +104,7 @@
     "shortcut": "a"
   },
   {
-    "id": 15,
+    "id": 14,
     "name": "Água com Gás",
     "description": "",
     "price": 4.00,
@@ -120,12 +112,20 @@
     "shortcut": "g"
   },
   {
-    "id": 16,
+    "id": 15,
     "name": "Bebidas Quentes ou Vinho",
     "description": "Chocolate Quente, Quentao ou Vinho",
     "price": 7.00,
     "category": "Bebidas",
     "shortcut": "v"
+  },
+  {
+    "id": 16,
+    "name": "Refrigerante Coca-Cola 600ml",
+    "description": "Zero ou Normal",
+    "price": 10.00,
+    "category": "Bebidas",
+    "shortcut": "b"
   },
   {
     "id": 17,

@@ -52,7 +52,7 @@ body {
 
 .cart-item {
   border-bottom: 1px solid #C4B494;
-  padding: 8px 0;
+  padding: 4px 0;
 }
 
 .cart-item:last-child {

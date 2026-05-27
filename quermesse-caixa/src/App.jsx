@@ -152,6 +152,8 @@ function App() {
   const [syncStatus, setSyncStatus] = useState('idle')
   const [showApiKey, setShowApiKey] = useState(false)
   const [showAdminPassword, setShowAdminPassword] = useState(false)
+  const [userFetchedData, setUserFetchedData] = useState(null)
+  const [loadingUserData, setLoadingUserData] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -198,7 +200,26 @@ function App() {
       .catch(err => console.error('Erro ao carregar produtos:', err))
   }, [])
 
+  // Clear state if localStorage is empty (fresh start)
   useEffect(() => {
+    const hasData = localStorage.getItem('quermesse-sales') ||
+                   localStorage.getItem('quermesse-transactions') ||
+                   localStorage.getItem('quermesse-fichas')
+
+    if (!hasData) {
+      // Ensure we have empty state
+      setSales([])
+      setTransactions([])
+      setFichas({ 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 })
+    }
+  }, [])
+
+  useEffect(() => {
+    // Don't load data if we're in the middle of clearing
+    if (localStorage.getItem('quermesse-clearing')) {
+      return
+    }
+
     const savedSales = localStorage.getItem('quermesse-sales')
     if (savedSales) {
       setSales(JSON.parse(savedSales))
@@ -280,43 +301,31 @@ function App() {
     const syncToAPIWithCurrentData = async () => {
       const today = getDateGMT3()
 
-      // Calculate transaction totals by type using current sales
-      const totalsByType = {
-        pix: sales.filter(s => s.paymentMethod === 'Pix').reduce((sum, s) => sum + s.total, 0),
-        cartao: sales.filter(s => s.paymentMethod === 'Cartão').reduce((sum, s) => sum + s.total, 0),
-        dinheiro: sales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0)
+      // Calculate today's local data
+      const todaySales = sales.filter(s => s.timestamp.startsWith(today))
+      const todayTransactions = transactions.filter(t => t.timestamp.startsWith(today))
+
+      const localTodayTotals = {
+        pix: todaySales.filter(s => s.paymentMethod === 'Pix').reduce((sum, s) => sum + s.total, 0),
+        cartao: todaySales.filter(s => s.paymentMethod === 'Cartão').reduce((sum, s) => sum + s.total, 0),
+        dinheiro: todaySales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0),
+        fichas: todayTransactions.filter(t => t.type === 'ficha' && t.subType === 'entrada').reduce((sum, t) => sum + (t.total || 0), 0),
+        money: todayTransactions.filter(t => t.type === 'real' && t.subType === 'deposit').reduce((sum, t) => sum + t.amount, 0) - todayTransactions.filter(t => t.type === 'real' && t.subType === 'withdraw').reduce((sum, t) => sum + t.amount, 0)
       }
 
-      // Calculate total sales
-      const totalSales = totalsByType.pix + totalsByType.cartao + totalsByType.dinheiro
+      // Get backend base
+      const backendBase = userFetchedData?.[0] || { transactions: {}, fichas: 0, money: 0 }
 
-      // Calculate fichas total from:
-      // 1. Today's manual fichas entries (transactions)
-      let manualFichasTotal = 0
-      transactions.filter(t =>
-        t.type === 'ficha' &&
-        t.subType === 'entrada' &&
-        t.timestamp.startsWith(today)
-      ).forEach(transaction => {
-        manualFichasTotal += transaction.total || 0
-      })
-
-      // 2. Fichas given in all sales today
-      let salesFichasTotal = 0
-      sales.filter(s => s.timestamp.startsWith(today)).forEach(sale => {
-        if (sale.fichasGiven) {
-          Object.entries(sale.fichasGiven).forEach(([denom, count]) => {
-            salesFichasTotal += parseInt(denom) * count
-          })
-        }
-      })
-
-      // const fichasTotal = manualFichasTotal + salesFichasTotal
-
+      // Combined totals to sync
       const payload = {
         date: today,
-        transactions: totalsByType,
-        fichas: manualFichasTotal
+        transactions: {
+          pix: (backendBase.transactions?.pix || 0) + localTodayTotals.pix,
+          cartao: (backendBase.transactions?.cartao || 0) + localTodayTotals.cartao,
+          dinheiro: (backendBase.transactions?.dinheiro || 0) + localTodayTotals.dinheiro
+        },
+        fichas: (backendBase.fichas || 0) + localTodayTotals.fichas,
+        money: (backendBase.money || 0) + localTodayTotals.money
       }
 
       try {
@@ -345,11 +354,18 @@ function App() {
       syncToAPIWithCurrentData()
     }, 3 * 60 * 1000) // 3 minutes
 
-    // Also sync immediately
-    syncToAPIWithCurrentData()
-
     return () => clearInterval(syncInterval)
-  }, [userApiKey, sales, transactions])
+  }, [userApiKey, sales, transactions, userFetchedData])
+
+  // Clear backend data when API key is cleared
+  useEffect(() => {
+    if (!userApiKey) {
+      setUserFetchedData(null)
+      setAdminData([])
+      setAdminDataSinceBeginning([])
+      setAdminAuthenticated(false)
+    }
+  }, [userApiKey])
 
   const fetchAdminData = async (date) => {
     if (!adminPassword) return
@@ -382,43 +398,31 @@ function App() {
 
     const today = getDateGMT3()
 
-    // Calculate transaction totals by type
-    const totalsByType = {
-      pix: sales.filter(s => s.paymentMethod === 'Pix').reduce((sum, s) => sum + s.total, 0),
-      cartao: sales.filter(s => s.paymentMethod === 'Cartão').reduce((sum, s) => sum + s.total, 0),
-      dinheiro: sales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0)
+    // Calculate today's local data
+    const todaySales = sales.filter(s => s.timestamp.startsWith(today))
+    const todayTransactions = transactions.filter(t => t.timestamp.startsWith(today))
+
+    const localTodayTotals = {
+      pix: todaySales.filter(s => s.paymentMethod === 'Pix').reduce((sum, s) => sum + s.total, 0),
+      cartao: todaySales.filter(s => s.paymentMethod === 'Cartão').reduce((sum, s) => sum + s.total, 0),
+      dinheiro: todaySales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0),
+      fichas: todayTransactions.filter(t => t.type === 'ficha' && t.subType === 'entrada').reduce((sum, t) => sum + (t.total || 0), 0),
+      money: todayTransactions.filter(t => t.type === 'real' && t.subType === 'deposit').reduce((sum, t) => sum + t.amount, 0) - todayTransactions.filter(t => t.type === 'real' && t.subType === 'withdraw').reduce((sum, t) => sum + t.amount, 0)
     }
 
-    // Calculate total sales
-    const totalSales = totalsByType.pix + totalsByType.cartao + totalsByType.dinheiro
+    // Get backend base
+    const backendBase = userFetchedData?.[0] || { transactions: {}, fichas: 0, money: 0 }
 
-    // Calculate fichas total from:
-    // 1. Today's manual fichas entries (transactions)
-    let manualFichasTotal = 0
-    transactions.filter(t =>
-      t.type === 'ficha' &&
-      t.subType === 'entrada' &&
-      t.timestamp.startsWith(today)
-    ).forEach(transaction => {
-      manualFichasTotal += transaction.total || 0
-    })
-
-    // 2. Fichas given in all sales today
-    let salesFichasTotal = 0
-    sales.filter(s => s.timestamp.startsWith(today)).forEach(sale => {
-      if (sale.fichasGiven) {
-        Object.entries(sale.fichasGiven).forEach(([denom, count]) => {
-          salesFichasTotal += parseInt(denom) * count
-        })
-      }
-    })
-
-    const fichasTotal = manualFichasTotal + salesFichasTotal
-
+    // Combined totals to sync
     const payload = {
       date: today,
-      transactions: totalsByType,
-      fichas: fichasTotal
+      transactions: {
+        pix: (backendBase.transactions?.pix || 0) + localTodayTotals.pix,
+        cartao: (backendBase.transactions?.cartao || 0) + localTodayTotals.cartao,
+        dinheiro: (backendBase.transactions?.dinheiro || 0) + localTodayTotals.dinheiro
+      },
+      fichas: (backendBase.fichas || 0) + localTodayTotals.fichas,
+      money: (backendBase.money || 0) + localTodayTotals.money
     }
 
     try {
@@ -500,6 +504,8 @@ function App() {
     setUserApiKeyExpiry(expiryTime)
     setSetApiKeyDialogOpen(false)
     setApiKeyInput('')
+    // Fetch user data from backend on login
+    fetchUserData(fullApiKey)
   }
 
   const clearApiKey = () => {
@@ -507,6 +513,54 @@ function App() {
     localStorage.removeItem('quermesse-api-key-expiry')
     setUserApiKey('')
     setUserApiKeyExpiry(null)
+    setUserFetchedData(null)
+    setAdminAuthenticated(false)
+    setAdminData([])
+    setAdminDataSinceBeginning([])
+  }
+
+  const getUserIdFromApiKey = (apiKey) => {
+    const mapping = {
+      'caixaA2026!-quermesse-santa-clara': 'CAIXA_A',
+      'caixaB2026!-quermesse-santa-clara': 'CAIXA_B',
+      'caixaC2026!-quermesse-santa-clara': 'CAIXA_C'
+    }
+    return mapping[apiKey] || null
+  }
+
+  const fetchUserData = async (apiKey) => {
+    try {
+      setLoadingUserData(true)
+      const today = getDateGMT3()
+      const response = await fetch(`${API_BASE_URL}/transactions?day=${today}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setUserFetchedData(data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error)
+    } finally {
+      setLoadingUserData(false)
+    }
+  }
+
+  const calculateTotalRealMoney = () => {
+    const deposits = transactions
+      .filter(t => t.type === 'real' && t.subType === 'deposit')
+      .reduce((sum, t) => sum + t.amount, 0)
+
+    const withdrawals = transactions
+      .filter(t => t.type === 'real' && t.subType === 'withdraw')
+      .reduce((sum, t) => sum + t.amount, 0)
+
+    return deposits - withdrawals
   }
 
   const getTotalByUser = (userId) => {
@@ -975,8 +1029,42 @@ function App() {
   }
 
   const clearAllSales = () => {
+    // Clear all state and localStorage immediately
     setSales([])
+    setTransactions([])
+    setFichas({ 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 })
+    setCart([])
+    setUserApiKey('')
+    setUserApiKeyExpiry(null)
+    setAdminAuthenticated(false)
+    setAdminPassword('')
+    setAdminData([])
+    setAdminDataSinceBeginning([])
+    setUserFetchedData(null)
+    setLoadingUserData(false)
+    setLoadingAdmin(false)
+    setSyncStatus('idle')
+
+    // Clear all localStorage keys
     localStorage.removeItem('quermesse-sales')
+    localStorage.removeItem('quermesse-transactions')
+    localStorage.removeItem('quermesse-fichas')
+    localStorage.removeItem('quermesse-api-key')
+    localStorage.removeItem('quermesse-api-key-expiry')
+    localStorage.removeItem('quermesse-change-mode')
+
+    // Stop any active API polling
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
+      debounceTimeoutRef.current = null
+    }
+
+    // Set a flag to prevent data reload from localStorage
+    localStorage.setItem('quermesse-clearing', 'true')
+    setTimeout(() => {
+      localStorage.removeItem('quermesse-clearing')
+    }, 1000)
+
     setConfirmClearDialogOpen(false)
   }
 
@@ -1001,11 +1089,52 @@ function App() {
     }
   }
 
-  const filteredSales = adminFilter === 'all'
-    ? [...sales].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-    : [...sales]
-        .filter(sale => sale.paymentMethod.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') === adminFilter)
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+  // Create a combined list of local sales and backend data
+  const combinedSales = []
+
+  // Add local sales (newest first)
+  const localSales = adminFilter === 'all'
+    ? [...sales]
+    : sales.filter(sale => sale.paymentMethod.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') === adminFilter)
+
+  localSales.forEach(sale => {
+    combinedSales.push({
+      ...sale,
+      type: 'local',
+      timestamp: sale.timestamp
+    })
+  })
+
+  const getBackendTotals = () => {
+    if (!userFetchedData || userFetchedData.length === 0) return null
+    const todayData = userFetchedData[0]
+    return {
+      pix: todayData.transactions?.pix || 0,
+      cartao: todayData.transactions?.cartao || 0,
+      dinheiro: todayData.transactions?.dinheiro || 0,
+      fichas: todayData.fichas || 0,
+      money: todayData.money || 0,
+      date: todayData.date
+    }
+  }
+
+  // Get today's date and backend totals (needed for combined list)
+  const today = getDateGMT3()
+  const backendTotals = getBackendTotals()
+
+  // Add backend data row at the bottom
+  if (backendTotals) {
+    combinedSales.push({
+      id: 'backend-today',
+      type: 'backend',
+      timestamp: `${today}T00:00:00Z`, // Midnight of today
+      paymentMethod: 'Sincronizado',
+      total: backendTotals.pix + backendTotals.cartao + backendTotals.dinheiro
+    })
+  }
+
+  // Sort by timestamp (newest first)
+  const sortedCombinedSales = combinedSales.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
 
   const overallTotal = sales.reduce((sum, sale) => sum + sale.total, 0)
 
@@ -1013,6 +1142,20 @@ function App() {
     pix: sales.filter(s => s.paymentMethod === 'Pix').reduce((sum, s) => sum + s.total, 0),
     cartao: sales.filter(s => s.paymentMethod === 'Cartão').reduce((sum, s) => sum + s.total, 0),
     dinheiro: sales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0)
+  }
+
+  
+
+  // Calculate combined totals (backend base + local today's data)
+  const localTodaySales = sales.filter(s => s.timestamp.startsWith(today))
+  const localTodayTransactions = transactions.filter(t => t.timestamp.startsWith(today))
+
+  const combinedTotals = {
+    pix: (backendTotals?.pix || 0) + localTodaySales.filter(s => s.paymentMethod === 'Pix').reduce((sum, s) => sum + s.total, 0),
+    cartao: (backendTotals?.cartao || 0) + localTodaySales.filter(s => s.paymentMethod === 'Cartão').reduce((sum, s) => sum + s.total, 0),
+    dinheiro: (backendTotals?.dinheiro || 0) + localTodaySales.filter(s => s.paymentMethod === 'Dinheiro').reduce((sum, s) => sum + s.total, 0),
+    fichas: (backendTotals?.fichas || 0) + localTodayTransactions.filter(t => t.type === 'ficha' && t.subType === 'entrada').reduce((sum, t) => sum + (t.total || 0), 0),
+    money: (backendTotals?.money || 0) + localTodayTransactions.filter(t => t.type === 'real' && t.subType === 'deposit').reduce((sum, t) => sum + t.amount, 0) - localTodayTransactions.filter(t => t.type === 'real' && t.subType === 'withdraw').reduce((sum, t) => sum + t.amount, 0)
   }
 
   const formatGMT3DateTime = (isoString) => {
@@ -1093,7 +1236,14 @@ function App() {
               color="inherit"
               onClick={() => setConfirmClearDialogOpen(true)}
               startIcon={<RefreshIcon />}
-              sx={{ borderColor: 'rgba(255,255,255,0.3)', '&:hover': { borderColor: 'white' } }}
+              sx={{
+                borderColor: 'rgba(255,255,255,0.3)',
+                '&:hover': {
+                  borderColor: 'white',
+                  bgcolor: 'rgba(255,0,0,0.1)'
+                },
+                fontWeight: 'bold'
+              }}
             >
               Novo Dia
             </Button>
@@ -1436,30 +1586,30 @@ function App() {
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, bgcolor: '#8D6E63', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
                       <Typography variant="body2">Total</Typography>
-                      <Typography variant="h5">R$ {overallTotal.toFixed(2)}</Typography>
+                      <Typography variant="h5">R$ {(combinedTotals.pix + combinedTotals.cartao + combinedTotals.dinheiro).toFixed(2)}</Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, bgcolor: '#A1887F', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
                       <Typography variant="body2">Total Pix</Typography>
-                      <Typography variant="h5">R$ {totalsByType.pix.toFixed(2)}</Typography>
+                      <Typography variant="h5">R$ {combinedTotals.pix.toFixed(2)}</Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, bgcolor: '#BCAAA4', color: '#3E2723', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
                       <Typography variant="body2">Total Cartão</Typography>
-                      <Typography variant="h5">R$ {totalsByType.cartao.toFixed(2)}</Typography>
+                      <Typography variant="h5">R$ {combinedTotals.cartao.toFixed(2)}</Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, bgcolor: '#D7CCC8', color: '#3E2723', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
                       <Typography variant="body2">Total Dinheiro</Typography>
-                      <Typography variant="h5">R$ {totalsByType.dinheiro.toFixed(2)}</Typography>
+                      <Typography variant="h5">R$ {combinedTotals.dinheiro.toFixed(2)}</Typography>
                     </Paper>
                   </Grid>
                 </Grid>
 
-                {sales.length === 0 ? (
+                {sales.length === 0 && !backendTotals ? (
                   <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
                     <AssessmentIcon sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
                     <Typography variant="h6">Nenhuma venda registrada</Typography>
@@ -1477,39 +1627,62 @@ function App() {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {filteredSales.map((sale) => (
-                            <TableRow key={sale.id} hover>
-                              <TableCell>{formatGMT3DateTime(sale.timestamp)}</TableCell>
-                              <TableCell>
-                                <Chip
-                                  label={sale.paymentMethod}
-                                  color={getPaymentMethodColor(sale.paymentMethod)}
-                                  size="small"
-                                />
-                              </TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600 }}>
-                                R$ {sale.total.toFixed(2)}
-                              </TableCell>
-                              <TableCell align="right">
-                                <IconButton
-                                  onClick={() => openEditSaleDialog(sale)}
-                                  color="primary"
-                                  size="small"
-                                  title="Editar venda"
-                                >
-                                  <EditIcon />
-                                </IconButton>
-                                <IconButton
-                                  onClick={() => deleteSale(sale.id)}
-                                  color="error"
-                                  size="small"
-                                  title="Excluir venda"
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {sortedCombinedSales.map((sale) => {
+                            if (sale.type === 'backend') {
+                              // Backend data row
+                              return (
+                                <TableRow key={sale.id} sx={{ bgcolor: '#E8DFD0' }}>
+                                  <TableCell>
+                                    {today} 00:00
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="caption" sx={{ color: '#5D4037' }}>
+                                      Dados sincronizados
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                                    R$ {sale.total.toFixed(2)}
+                                  </TableCell>
+                                  <TableCell align="right" />
+                                </TableRow>
+                              )
+                            } else {
+                              // Local sales row
+                              return (
+                                <TableRow key={sale.id} hover>
+                                  <TableCell>{formatGMT3DateTime(sale.timestamp)}</TableCell>
+                                  <TableCell>
+                                    <Chip
+                                      label={sale.paymentMethod}
+                                      color={getPaymentMethodColor(sale.paymentMethod)}
+                                      size="small"
+                                    />
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                                    R$ {sale.total.toFixed(2)}
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    <IconButton
+                                      onClick={() => openEditSaleDialog(sale)}
+                                      color="primary"
+                                      size="small"
+                                      title="Editar venda"
+                                    >
+                                      <EditIcon />
+                                    </IconButton>
+                                    <IconButton
+                                      onClick={() => deleteSale(sale.id)}
+                                      color="error"
+                                      size="small"
+                                      title="Excluir venda"
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            }
+                          })}
                         </TableBody>
                       </Table>
                     </TableContainer>
@@ -1592,29 +1765,29 @@ function App() {
                     <Paper sx={{ p: 2, bgcolor: '#BCAAA4', color: '#3E2723', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
                       <Typography variant="body2">Total Fichas Entradas</Typography>
                       <Typography variant="h5">
-                        R$ {transactions.filter(t => t.type === 'ficha' && t.subType === 'entrada').reduce((sum, t) => sum + t.total, 0).toFixed(2)}
+                        R$ {combinedTotals.fichas.toFixed(2)}
                       </Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={12} sm={4} md={4}>
                     <Paper sx={{ p: 2, bgcolor: '#5D4037', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
-                      <Typography variant="body2">Entradas Dinheiro Real</Typography>
+                      <Typography variant="body2">Saldo Dinheiro Real</Typography>
                       <Typography variant="h5">
-                        R$ {transactions.filter(t => t.type === 'real' && t.subType === 'deposit').reduce((sum, t) => sum + t.amount, 0).toFixed(2)}
+                        R$ {combinedTotals.money.toFixed(2)}
                       </Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={12} sm={4} md={4}>
                     <Paper sx={{ p: 2, bgcolor: '#3E2723', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
-                      <Typography variant="body2">Saídas Dinheiro Real</Typography>
+                      <Typography variant="body2">Total Vendido</Typography>
                       <Typography variant="h5">
-                        R$ {transactions.filter(t => t.type === 'real' && t.subType === 'withdraw').reduce((sum, t) => sum + t.amount, 0).toFixed(2)}
+                        R$ {(combinedTotals.pix + combinedTotals.cartao + combinedTotals.dinheiro).toFixed(2)}
                       </Typography>
                     </Paper>
                   </Grid>
                 </Grid>
 
-                {transactions.length === 0 ? (
+                {transactions.length === 0 && !backendTotals ? (
                   <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
                     <MoneyIcon sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
                     <Typography variant="h6">Nenhuma transação registrada</Typography>
@@ -1633,48 +1806,115 @@ function App() {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {[...transactions].reverse().map((transaction) => (
-                            <TableRow key={transaction.id} hover>
-                              <TableCell>{formatGMT3DateTime(transaction.timestamp)}</TableCell>
-                              <TableCell>
-                                {transaction.type === 'ficha' ? (
-                                  <Chip label="Ficha" color="info" size="small" />
-                                ) : transaction.subType === 'deposit' ? (
-                                  <Chip label="Entrada" color="success" size="small" />
-                                ) : (
-                                  <Chip label="Saída" color="error" size="small" />
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {transaction.type === 'ficha' ? (
-                                  transaction.description || `${transaction.quantity}x Ficha R$ ${transaction.denomination}`
-                                ) : transaction.subType === 'deposit' ? (
-                                  'Entrada de dinheiro real'
-                                ) : (
-                                  'Saída de dinheiro real'
-                                )}
-                              </TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600 }}>
-                                {transaction.type === 'ficha' ? (
-                                  <>+R$ {transaction.total.toFixed(2)}</>
-                                ) : transaction.subType === 'deposit' ? (
-                                  <>+R$ {transaction.amount.toFixed(2)}</>
-                                ) : (
-                                  <>-R$ {transaction.amount.toFixed(2)}</>
-                                )}
-                              </TableCell>
-                              <TableCell align="right">
-                                <IconButton
-                                  onClick={() => deleteTransaction(transaction.id)}
-                                  color="error"
-                                  size="small"
-                                  title="Excluir transação"
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {/* Create combined transactions list */}
+                          {(() => {
+                            const combinedTransactions = []
+
+                            // Add local transactions (newest first)
+                            transactions.forEach(transaction => {
+                              combinedTransactions.push({
+                                ...transaction,
+                                source: 'local' // Use 'source' instead of overwriting 'type'
+                              })
+                            })
+
+                            // Add backend data rows at the bottom
+                            if (backendTotals) {
+                              // Add fichas backend row
+                              combinedTransactions.push({
+                                id: 'backend-fichas',
+                                source: 'backend',
+                                type: 'ficha',
+                                timestamp: `${today}T00:00:00Z`,
+                                displayType: 'Ficha',
+                                description: 'Total de Fichas (sincronizado)',
+                                amount: backendTotals.fichas,
+                                displayAmount: `+R$ ${backendTotals.fichas.toFixed(2)}`
+                              })
+
+                              // Add money backend row
+                              combinedTransactions.push({
+                                id: 'backend-money',
+                                source: 'backend',
+                                type: 'money',
+                                timestamp: `${today}T00:00:00Z`,
+                                displayType: 'Saldo',
+                                description: 'Saldo Dinheiro Real (sincronizado)',
+                                amount: backendTotals.money,
+                                displayAmount: `R$ ${backendTotals.money.toFixed(2)}`
+                              })
+                            }
+
+                            // Sort by timestamp (newest first)
+                            return combinedTransactions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                          })().map((transaction) => {
+                            if (transaction.source === 'backend') {
+                              // Backend data row
+                              return (
+                                <TableRow key={transaction.id} sx={{ bgcolor: '#E8DFD0' }}>
+                                  <TableCell>
+                                    {today} 00:00
+                                  </TableCell>
+                                  <TableCell>
+                                    <Chip label={transaction.displayType} color={transaction.displayType === 'Ficha' ? 'info' : 'success'} size="small" />
+                                  </TableCell>
+                                  <TableCell>
+                                    {transaction.description}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                                    {transaction.displayAmount}
+                                  </TableCell>
+                                  <TableCell align="right" />
+                                </TableRow>
+                              )
+                            } else {
+                              // Local transactions row
+                              return (
+                                <TableRow key={transaction.id} hover>
+                                  <TableCell>{formatGMT3DateTime(transaction.timestamp)}</TableCell>
+                                  <TableCell>
+                                    {transaction.type === 'ficha' ? (
+                                      <Chip label="Ficha" color="info" size="small" />
+                                    ) : transaction.subType === 'deposit' ? (
+                                      <Chip label="Entrada" color="success" size="small" />
+                                    ) : (
+                                      <Chip label="Saída" color="error" size="small" />
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {transaction.type === 'ficha' ? (
+                                      transaction.description || `${transaction.quantity}x Ficha R$ ${transaction.denomination}`
+                                    ) : transaction.subType === 'deposit' ? (
+                                      'Entrada de dinheiro real'
+                                    ) : (
+                                      'Saída de dinheiro real'
+                                    )}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                                    {transaction.source === 'backend' ? (
+                                      transaction.displayAmount || '-'
+                                    ) : transaction.type === 'ficha' ? (
+                                      transaction.total ? `+R$ ${transaction.total.toFixed(2)}` : '-'
+                                    ) : transaction.subType === 'deposit' ? (
+                                      transaction.amount ? `+R$ ${transaction.amount.toFixed(2)}` : '-'
+                                    ) : (
+                                      transaction.amount ? `-R$ ${transaction.amount.toFixed(2)}` : '-'
+                                    )}
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    <IconButton
+                                      onClick={() => deleteTransaction(transaction.id)}
+                                      color="error"
+                                      size="small"
+                                      title="Excluir transação"
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            }
+                          })}
                         </TableBody>
                       </Table>
                     </TableContainer>
@@ -1767,7 +2007,15 @@ function App() {
 
                 <Paper sx={{ p: 3, bgcolor: '#8D6E63', color: 'white', mb: 3 }}>
                   <Typography variant="body2">Total em Fichas:</Typography>
-                  <Typography variant="h4">R$ {totalFichasValue.toFixed(2)}</Typography>
+                  <Typography variant="h4">R$ {combinedTotals.fichas.toFixed(2)}</Typography>
+                </Paper>
+
+                <Paper sx={{ p: 3, bgcolor: '#5D4037', color: 'white', mb: 3 }}>
+                  <Typography variant="body2">Total em Dinheiro Real:</Typography>
+                  <Typography variant="h4">R$ {combinedTotals.money.toFixed(2)}</Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8, mt: 1, display: 'block' }}>
+                    (Entradas - Saídas)
+                  </Typography>
                 </Paper>
 
                 <Button
@@ -1921,12 +2169,12 @@ function App() {
                                     background: 'linear-gradient(135deg, #8D6E63 0%, #6D4C41 100%)',
                                     color: 'white',
                                     border: userData && userData.fichas && userData.transactions ?
-                                      `4px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '#ff0000' : 'transparent'}` : 'transparent',
+                                      `4px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 100 ? '#ff0000' : 'transparent'}` : 'transparent',
                                     boxShadow: userData && userData.fichas && userData.transactions ?
-                                      Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '0 0 20px rgba(255, 0, 0, 0.5)' : 'none' : 'none',
+                                      Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 100 ? '0 0 20px rgba(255, 0, 0, 0.5)' : 'none' : 'none',
                                     '&:focus': {
                                       outline: userData && userData.fichas && userData.transactions ?
-                                        `4px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 50 ? '#ff0000' : 'transparent'}` : 'transparent'
+                                        `4px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 100 ? '#ff0000' : 'transparent'}` : 'transparent'
                                     }
                                   }}
                                   onClick={() => {
@@ -2294,23 +2542,50 @@ function App() {
       {/* Confirm Clear Dialog / Novo Dia */}
       <Dialog open={confirmClearDialogOpen} onClose={() => setConfirmClearDialogOpen(false)}>
         <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'warning.main' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main' }}>
             <RefreshIcon />
-            Novo Dia - Confirmar
+            Novo Dia - Limpar Tudo
           </Box>
         </DialogTitle>
         <DialogContent>
           <Typography>
-            Tem certeza que deseja iniciar um novo dia? Isso limpará todas as vendas, transações e fichas. Esta ação não pode ser desfeita.
+            Tem certeza que deseja iniciar um novo dia? Isso limpará absolutamente tudo:
           </Typography>
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              • Todas as vendas
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              • Todas as transações de entrada/saída
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              • Todas as fichas e dinheiro real
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              • Dados sincronizados com servidor
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              • API keys e sessões
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              • Dados carregados do backend
+            </Typography>
+          </Box>
           {(sales.length > 0 || transactions.length > 0) && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                {sales.length} venda(s) serão excluída(s).
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                Dados que serão excluídos:
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {transactions.length} transação(ões) serão excluída(s).
-              </Typography>
+              {sales.length > 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  • {sales.length} venda(s)
+                </Typography>
+              )}
+              {transactions.length > 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  • {transactions.length} transação(ões)
+                </Typography>
+              )}
             </Box>
           )}
         </DialogContent>
