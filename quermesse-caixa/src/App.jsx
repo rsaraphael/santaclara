@@ -245,9 +245,17 @@ function App() {
       if (now < expiryTime) {
         setUserApiKey(savedApiKey)
         setUserApiKeyExpiry(expiryTime)
+        // Load user fetched data from localStorage (for immediate display)
+        const savedUserFetchedData = localStorage.getItem('quermesse-user-fetched-data')
+        if (savedUserFetchedData) {
+          setUserFetchedData(JSON.parse(savedUserFetchedData))
+        }
+        // Fetch fresh data from backend
+        fetchUserData(savedApiKey)
       } else {
         localStorage.removeItem('quermesse-api-key')
         localStorage.removeItem('quermesse-api-key-expiry')
+        localStorage.removeItem('quermesse-user-fetched-data')
       }
     }
   }, [])
@@ -511,6 +519,7 @@ function App() {
   const clearApiKey = () => {
     localStorage.removeItem('quermesse-api-key')
     localStorage.removeItem('quermesse-api-key-expiry')
+    localStorage.removeItem('quermesse-user-fetched-data')
     setUserApiKey('')
     setUserApiKeyExpiry(null)
     setUserFetchedData(null)
@@ -542,7 +551,9 @@ function App() {
 
       if (response.ok) {
         const data = await response.json()
-        setUserFetchedData(data.data || [])
+        const fetchedData = data.data || []
+        setUserFetchedData(fetchedData)
+        localStorage.setItem('quermesse-user-fetched-data', JSON.stringify(fetchedData))
       }
     } catch (error) {
       console.error('Error fetching user data:', error)
@@ -1122,8 +1133,8 @@ function App() {
   const today = getDateGMT3()
   const backendTotals = getBackendTotals()
 
-  // Add backend data row at the bottom
-  if (backendTotals) {
+  // Add backend data row at the bottom only if values are non-zero
+  if (backendTotals && (backendTotals.pix > 0 || backendTotals.cartao > 0 || backendTotals.dinheiro > 0)) {
     combinedSales.push({
       id: 'backend-today',
       type: 'backend',
@@ -1818,31 +1829,35 @@ function App() {
                               })
                             })
 
-                            // Add backend data rows at the bottom
+                            // Add backend data rows at the bottom only if values are non-zero
                             if (backendTotals) {
-                              // Add fichas backend row
-                              combinedTransactions.push({
-                                id: 'backend-fichas',
-                                source: 'backend',
-                                type: 'ficha',
-                                timestamp: `${today}T00:00:00Z`,
-                                displayType: 'Ficha',
-                                description: 'Total de Fichas (sincronizado)',
-                                amount: backendTotals.fichas,
-                                displayAmount: `+R$ ${backendTotals.fichas.toFixed(2)}`
-                              })
+                              // Add fichas backend row only if fichas > 0
+                              if (backendTotals.fichas > 0) {
+                                combinedTransactions.push({
+                                  id: 'backend-fichas',
+                                  source: 'backend',
+                                  type: 'ficha',
+                                  timestamp: `${today}T00:00:00Z`,
+                                  displayType: 'Ficha',
+                                  description: 'Total de Fichas (sincronizado)',
+                                  amount: backendTotals.fichas,
+                                  displayAmount: `R$ ${backendTotals.fichas.toFixed(2)}`
+                                })
+                              }
 
-                              // Add money backend row
-                              combinedTransactions.push({
-                                id: 'backend-money',
-                                source: 'backend',
-                                type: 'money',
-                                timestamp: `${today}T00:00:00Z`,
-                                displayType: 'Saldo',
-                                description: 'Saldo Dinheiro Real (sincronizado)',
-                                amount: backendTotals.money,
-                                displayAmount: `R$ ${backendTotals.money.toFixed(2)}`
-                              })
+                              // Add money backend row only if money != 0
+                              if (backendTotals.money !== 0) {
+                                combinedTransactions.push({
+                                  id: 'backend-money',
+                                  source: 'backend',
+                                  type: 'money',
+                                  timestamp: `${today}T00:00:00Z`,
+                                  displayType: 'Saldo',
+                                  description: 'Saldo Dinheiro Real (sincronizado)',
+                                  amount: backendTotals.money,
+                                  displayAmount: `R$ ${backendTotals.money.toFixed(2)}`
+                                })
+                              }
                             }
 
                             // Sort by timestamp (newest first)
@@ -1894,11 +1909,11 @@ function App() {
                                     {transaction.source === 'backend' ? (
                                       transaction.displayAmount || '-'
                                     ) : transaction.type === 'ficha' ? (
-                                      transaction.total ? `+R$ ${transaction.total.toFixed(2)}` : '-'
+                                      transaction.total ? `R$ ${transaction.total.toFixed(2)}` : '-'
                                     ) : transaction.subType === 'deposit' ? (
-                                      transaction.amount ? `+R$ ${transaction.amount.toFixed(2)}` : '-'
+                                      transaction.amount ? `R$ ${transaction.amount.toFixed(2)}` : '-'
                                     ) : (
-                                      transaction.amount ? `-R$ ${transaction.amount.toFixed(2)}` : '-'
+                                      transaction.amount ? `R$ ${transaction.amount.toFixed(2)}` : '-'
                                     )}
                                   </TableCell>
                                   <TableCell align="right">
