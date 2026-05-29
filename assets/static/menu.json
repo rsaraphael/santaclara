@@ -90,7 +90,7 @@
       "additionalItemsGroups": []
     },
     {
-      "id": 10,
+      "id": 12,
       "name": "Cone",
       "description": null,
       "price": 1000,
@@ -102,7 +102,7 @@
       "id": 11,
       "name": "Maçã do Amor",
       "description": null,
-      "price": 700,
+      "price": 1000,
       "adultsOnly": false,
       "enabled": true,
       "additionalItemsGroups": []
