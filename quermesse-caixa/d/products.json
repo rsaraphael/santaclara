@@ -75,7 +75,7 @@
     "id": 10,
     "name": "Cone",
     "description": "",
-    "price": 10.00,
+    "price": 12.00,
     "category": "Doces",
     "shortcut": "n"
   },
@@ -83,7 +83,7 @@
     "id": 11,
     "name": "Maçã do Amor",
     "description": "",
-    "price": 7.00,
+    "price": 10.00,
     "category": "Doces",
     "shortcut": "m"
   },
