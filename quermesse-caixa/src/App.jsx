@@ -1086,7 +1086,7 @@ function App() {
   }
 
   const resetFichas = () => {
-    const emptyFichas = { 1: 0, 2: 0, 5: 0, 10: 0, 20: 0 }
+    const emptyFichas = { 1: 0, 2: 0, 3: 0, 5: 0, 10: 0, 20: 0 }
     saveFichasToStorage(emptyFichas)
   }
 
@@ -1772,7 +1772,7 @@ function App() {
                       </Typography>
                     </Paper>
                   </Grid> */}
-                  <Grid item xs={12} sm={4} md={4}>
+                  <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, bgcolor: '#BCAAA4', color: '#3E2723', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
                       <Typography variant="body2">Total Fichas Entradas</Typography>
                       <Typography variant="h5">
@@ -1780,19 +1780,27 @@ function App() {
                       </Typography>
                     </Paper>
                   </Grid>
-                  <Grid item xs={12} sm={4} md={4}>
+                  <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, bgcolor: '#5D4037', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
-                      <Typography variant="body2">Saldo Dinheiro Real</Typography>
+                      <Typography variant="body2">Saldo Dinheiro</Typography>
                       <Typography variant="h5">
-                        R$ {combinedTotals.money.toFixed(2)}
+                        R$ {(combinedTotals.money + combinedTotals.dinheiro).toFixed(2)}
                       </Typography>
                     </Paper>
                   </Grid>
-                  <Grid item xs={12} sm={4} md={4}>
+                  <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, bgcolor: '#3E2723', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
                       <Typography variant="body2">Total Vendido</Typography>
                       <Typography variant="h5">
                         R$ {(combinedTotals.pix + combinedTotals.cartao + combinedTotals.dinheiro).toFixed(2)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, bgcolor: combinedTotals.fichas - (combinedTotals.pix + combinedTotals.cartao + combinedTotals.dinheiro) < 100 ? '#ef5350' : '#8D6E63', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center', minHeight: 100 }}>
+                      <Typography variant="body2">Saldo Fichas</Typography>
+                      <Typography variant="h5">
+                        R$ {Math.max(0, combinedTotals.fichas - (combinedTotals.pix + combinedTotals.cartao + combinedTotals.dinheiro)).toFixed(2)}
                       </Typography>
                     </Paper>
                   </Grid>
@@ -2020,7 +2028,7 @@ function App() {
 
                 <Divider sx={{ my: 3 }} />
 
-                <Paper sx={{ p: 3, bgcolor: '#8D6E63', color: 'white', mb: 3 }}>
+                {/* <Paper sx={{ p: 3, bgcolor: '#8D6E63', color: 'white', mb: 3 }}>
                   <Typography variant="body2">Total em Fichas:</Typography>
                   <Typography variant="h4">R$ {combinedTotals.fichas.toFixed(2)}</Typography>
                 </Paper>
@@ -2031,7 +2039,7 @@ function App() {
                   <Typography variant="caption" sx={{ opacity: 0.8, mt: 1, display: 'block' }}>
                     (Entradas - Saídas)
                   </Typography>
-                </Paper>
+                </Paper> */}
 
                 <Button
                   fullWidth
@@ -2077,6 +2085,15 @@ function App() {
                     </Box>
                   </Box>
                 ))}
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: '#5D4037', color: 'white', borderRadius: 1 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Total
+                  </Typography>
+                  <Typography variant="h5" fontWeight="bold">
+                    R$ {totalFichasValue.toFixed(2)}
+                  </Typography>
+                </Box>
               </Paper>
             </Grid>
           </Grid>
