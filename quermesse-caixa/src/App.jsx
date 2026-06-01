@@ -54,7 +54,8 @@ import {
   Edit as EditIcon,
   AdminPanelSettings as AdminIcon,
   Lock as LockIcon,
-  Visibility as VisibilityIcon
+  Visibility as VisibilityIcon,
+  KeyboardReturn as KeyboardReturnIcon
 } from '@mui/icons-material'
 import './App.css'
 
@@ -131,6 +132,7 @@ function App() {
   const [editSalePaymentMethod, setEditSalePaymentMethod] = useState('')
   const [editingItemId, setEditingItemId] = useState(null)
   const [tempQuantity, setTempQuantity] = useState('')
+  const [devolucaoCounter, setDevolucaoCounter] = useState({ 1: 0, 2: 0, 5: 0, 10: 0, 20: 0, 50: 0, 100: 0 })
   const debounceTimeoutRef = useRef(null)
   const inputRefs = useRef({})
 
@@ -1300,12 +1302,21 @@ function App() {
                 </Box>
               }
             />
-            <Tab
+            {/* <Tab
               value="fichas"
               label={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <AccountBalanceIcon />
                   Fichas
+                </Box>
+              }
+            /> */}
+            <Tab
+              value="devolucao"
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <KeyboardReturnIcon />
+                  Devolução
                 </Box>
               }
             />
@@ -2094,6 +2105,175 @@ function App() {
                     R$ {totalFichasValue.toFixed(2)}
                   </Typography>
                 </Box>
+              </Paper>
+            </Grid>
+          </Grid>
+        ) : currentTab === 'devolucao' ? (
+          /* Devolução Panel - Calculator for counting bills */
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h5" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <MoneyIcon />
+                  Dinheiro
+                </Typography>
+
+                {/* Input Section */}
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Digite a quantidade de cada cédula
+                </Typography>
+
+                {[100, 50, 20, 10, 5, 2, 1].map((denom) => (
+                  <Box key={denom} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                      <Box sx={{
+                        width: 50,
+                        height: 50,
+                        bgcolor: denom >= 50 ? '#5D4037' : denom >= 20 ? '#795548' : denom >= 10 ? '#8D6E63' : denom >= 5 ? '#A1887F' : denom >= 2 ? '#BCAAA4' : '#D7CCC8',
+                        color: denom >= 10 ? 'white' : '#3E2723',
+                        borderRadius: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        fontSize: denom >= 50 ? '1rem' : '1.2rem'
+                      }}>
+                        {denom}
+                      </Box>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Total: R$ {((devolucaoCounter[denom] || 0) * denom).toFixed(2)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <TextField
+                      type="number"
+                      value={devolucaoCounter[denom] === 0 ? '' : devolucaoCounter[denom]}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const rawValue = e.target.value
+                        if (rawValue === '' || rawValue === '0') {
+                          setDevolucaoCounter(prev => ({ ...prev, [denom]: 0 }))
+                        } else {
+                          const value = parseInt(rawValue)
+                          if (!isNaN(value) && value >= 0) {
+                            setDevolucaoCounter(prev => ({ ...prev, [denom]: value }))
+                          }
+                        }
+                      }}
+                      inputProps={{ min: 0, style: { textAlign: 'center' } }}
+                      size="small"
+                      sx={{ width: 80 }}
+                    />
+                  </Box>
+                ))}
+
+                {/* Total */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: '#5D4037', color: 'white', borderRadius: 1, mt: 3 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Total
+                  </Typography>
+                  <Typography variant="h5" fontWeight="bold">
+                    R$ {Object.entries(devolucaoCounter).reduce((sum, [denom, count]) => sum + (parseInt(denom) * count), 0).toFixed(2)}
+                  </Typography>
+                </Box>
+
+                <Divider sx={{ my: 3 }} />
+
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="error"
+                  startIcon={<ClearIcon />}
+                  onClick={() => setDevolucaoCounter({ 1: 0, 2: 0, 5: 0, 10: 0, 20: 0, 50: 0, 100: 0 })}
+                >
+                  Limpar Contador
+                </Button>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h5" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <AccountBalanceIcon />
+                  Fichas
+                </Typography>
+
+                {/* Input Section */}
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Digite a quantidade de cada cédula
+                </Typography>
+
+                {DENOMINATIONS.map((denom) => (
+                  <Box key={denom} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                      <Box sx={{
+                        width: 50,
+                        height: 50,
+                        bgcolor: denom >= 20 ? '#A1887F' : denom >= 10 ? '#BCAAA4' : denom >= 5 ? '#A1887F' : '#D7CCC8',
+                        color: denom >= 10 ? 'white' : '#3E2723',
+                        borderRadius: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '1.2rem'
+                      }}>
+                        {denom}
+                      </Box>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Total: R$ {((fichas[denom] || 0) * denom).toFixed(2)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <TextField
+                      type="number"
+                      value={fichas[denom] === 0 ? '' : fichas[denom]}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const rawValue = e.target.value
+                        if (rawValue === '' || rawValue === '0') {
+                          const newFichas = { ...fichas, [denom]: 0 }
+                          setFichas(newFichas)
+                          localStorage.setItem('quermesse-fichas', JSON.stringify(newFichas))
+                        } else {
+                          const value = parseInt(rawValue)
+                          if (!isNaN(value) && value >= 0) {
+                            const newFichas = { ...fichas, [denom]: value }
+                            setFichas(newFichas)
+                            localStorage.setItem('quermesse-fichas', JSON.stringify(newFichas))
+                          }
+                        }
+                      }}
+                      inputProps={{ min: 0, style: { textAlign: 'center' } }}
+                      size="small"
+                      sx={{ width: 80 }}
+                    />
+                  </Box>
+                ))}
+
+                {/* Total */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: '#5D4037', color: 'white', borderRadius: 1, mt: 3 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Total
+                  </Typography>
+                  <Typography variant="h5" fontWeight="bold">
+                    R$ {totalFichasValue.toFixed(2)}
+                  </Typography>
+                </Box>
+
+                <Divider sx={{ my: 3 }} />
+
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="error"
+                  startIcon={<ClearIcon />}
+                  onClick={resetFichas}
+                >
+                  Limpar Fichas
+                </Button>
               </Paper>
             </Grid>
           </Grid>
