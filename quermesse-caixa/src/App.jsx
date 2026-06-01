@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Container,
   Grid,
@@ -56,7 +55,8 @@ import {
   AdminPanelSettings as AdminIcon,
   Lock as LockIcon,
   Visibility as VisibilityIcon,
-  KeyboardReturn as KeyboardReturnIcon
+  KeyboardReturn as KeyboardReturnIcon,
+  SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material'
 import './App.css'
 
@@ -102,16 +102,13 @@ const formatGMT3DateTime = (isoString) => {
 }
 
 function App() {
-  const navigate = useNavigate()
-  const location = useLocation()
+  // Check if accessing admin path (works with or without trailing slash)
+  const pathname = window.location.pathname.replace(/\/$/, '') // Remove trailing slash
+  const isAdminPath = pathname.endsWith('/admin')
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('Todos')
-  const [currentTab, setCurrentTab] = useState(() => {
-    // Initialize tab from URL
-    const path = location.pathname.replace('/', '') || 'caixa'
-    return ['caixa', 'historico', 'entradas', 'fichas', 'devolucao', 'admin'].includes(path) ? path : 'caixa'
-  })
+  const [currentTab, setCurrentTab] = useState('caixa')
   const [sales, setSales] = useState([])
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [confirmClearDialogOpen, setConfirmClearDialogOpen] = useState(false)
@@ -133,6 +130,8 @@ function App() {
   const [addRealMoneyDialogOpen, setAddRealMoneyDialogOpen] = useState(false)
   const [addRealMoneyAmount, setAddRealMoneyAmount] = useState('')
   const [addRealMoneyType, setAddRealMoneyType] = useState('deposit')
+  const [exchangeFichaDialogOpen, setExchangeFichaDialogOpen] = useState(false)
+  const [exchangeFichaAmount, setExchangeFichaAmount] = useState('')
   const [editSaleDialogOpen, setEditSaleDialogOpen] = useState(false)
   const [saleToEdit, setSaleToEdit] = useState(null)
   const [editSaleTotal, setEditSaleTotal] = useState('')
@@ -161,6 +160,8 @@ function App() {
   const [syncStatus, setSyncStatus] = useState('idle')
   const [showApiKey, setShowApiKey] = useState(false)
   const [showAdminPassword, setShowAdminPassword] = useState(false)
+  const [adminPasswordError, setAdminPasswordError] = useState('')
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false)
   const [userFetchedData, setUserFetchedData] = useState(null)
   const [loadingUserData, setLoadingUserData] = useState(false)
 
@@ -208,20 +209,6 @@ function App() {
       .then(data => setProducts(data))
       .catch(err => console.error('Erro ao carregar produtos:', err))
   }, [])
-
-  // Sync tab with URL
-  useEffect(() => {
-    const path = location.pathname.replace('/', '') || 'caixa'
-    if (['caixa', 'historico', 'entradas', 'fichas', 'devolucao', 'admin'].includes(path) && path !== currentTab) {
-      setCurrentTab(path)
-    }
-  }, [location.pathname])
-
-  // Update URL when tab changes
-  const handleTabChange = (_, newValue) => {
-    setCurrentTab(newValue)
-    navigate(newValue === 'caixa' ? '/' : `/${newValue}`)
-  }
 
   // Clear state if localStorage is empty (fresh start)
   useEffect(() => {
@@ -480,13 +467,13 @@ function App() {
 
   const fetchAllAdminData = async () => {
     if (!adminPassword) return
-
+    const xApiKey = adminPassword + '-quermesse-santa-clara'
     try {
       const response = await fetch(`${API_BASE_URL}/transactions?sinceBeginning=true`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': adminPassword
+          'x-api-key': xApiKey
         }
       })
 
@@ -690,6 +677,57 @@ function App() {
 
       setAddRealMoneyAmount('')
       setAddRealMoneyDialogOpen(false)
+    }
+  }
+
+  const exchangeFichaForMoney = () => {
+    const amount = parseFloat(exchangeFichaAmount) || 0
+    if (amount > 0) {
+      // Calculate fichas breakdown using change calculation
+      const { result } = calculateChange(amount, changeMode, fichas)
+
+      // Add fichas to the system
+      const newFichas = { ...fichas }
+      Object.entries(result).forEach(([denom, quantity]) => {
+        if (quantity > 0) {
+          newFichas[denom] = (newFichas[denom] || 0) + quantity
+        }
+      })
+      saveFichasToStorage(newFichas)
+
+      // Create a transaction for the exchange
+      const entries = []
+      Object.entries(result).forEach(([denom, quantity]) => {
+        if (quantity > 0) {
+          entries.push(`${quantity}x R$ ${denom}`)
+        }
+      })
+
+      const fichaTransaction = {
+        id: Date.now(),
+        timestamp: getTimestampGMT3(),
+        type: 'ficha',
+        subType: 'entrada',
+        description: 'Troca por Dinheiro',
+        breakdown: result,
+        total: amount
+      }
+
+      // Create a withdraw transaction for the money given out
+      const moneyTransaction = {
+        id: Date.now() + 1,
+        timestamp: getTimestampGMT3(),
+        type: 'real',
+        subType: 'withdraw',
+        amount,
+        description: `Troca por Fichas: R$ ${amount.toFixed(2)}`
+      }
+
+      const newTransactions = [...transactions, fichaTransaction, moneyTransaction]
+      saveTransactionsToStorage(newTransactions)
+
+      setExchangeFichaAmount('')
+      setExchangeFichaDialogOpen(false)
     }
   }
 
@@ -1217,6 +1255,390 @@ function App() {
     return sum + (parseInt(denom) * count)
   }, 0)
 
+  // Show only admin panel when accessing /admin
+  if (isAdminPath) {
+    return (
+      <div className="app-container">
+        <AppBar position="static" sx={{ background: 'linear-gradient(135deg, #3E2723 0%, #2D1B15 100%)' }}>
+          <Toolbar>
+            <AdminIcon sx={{ mr: 2 }} />
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              Painel Administrativo
+            </Typography>
+          </Toolbar>
+        </AppBar>
+
+        <Container maxWidth="xl" sx={{ mt: 3, mb: 3 }}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+                <Typography variant="h5" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <AdminIcon />
+                  Painel Administrativo
+                </Typography>
+
+                {!adminAuthenticated ? (
+                  <Box sx={{ textAlign: 'center', py: { xs: 4, sm: 8 } }}>
+                    <LockIcon sx={{ fontSize: { xs: 48, sm: 64 }, mb: 2, color: 'text.secondary' }} />
+                    <Typography variant="h6" gutterBottom>Área Restrita</Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom sx={{ px: 2 }}>
+                      Digite a senha de administrador para acessar
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      startIcon={<LockIcon />}
+                      onClick={() => setAdminPasswordDialogOpen(true)}
+                      sx={{ mt: 2 }}
+                    >
+                      Entrar com Senha
+                    </Button>
+                  </Box>
+                ) : (
+                  <>
+                    {loadingAdmin ? (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                        <CircularProgress />
+                      </Box>
+                    ) : (
+                      <>
+                        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              Dados de {getDateGMT3().split('-').reverse().join('/')}
+                            </Typography>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => {
+                                fetchAdminData(getDateGMT3())
+                                fetchAllAdminData()
+                              }}
+                              startIcon={<RefreshIcon />}
+                              color="primary"
+                            >
+                            </Button>
+                          </Box>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setAdminAuthenticated(false)}
+                            color="error"
+                          >
+                            Sair
+                          </Button>
+                        </Box>
+
+                        {/* Grand Total */}
+                        {adminData.length > 0 && (
+                          <Box sx={{ mb: 4, textAlign: 'center' }}>
+                            <Paper sx={{
+                              p: { xs: 2, sm: 3 },
+                              bgcolor: '#3E2723',
+                              color: 'white',
+                              display: 'inline-block',
+                              minWidth: { xs: '100%', sm: 320 },
+                              maxWidth: 400,
+                              boxShadow: 4
+                            }}>
+                              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                Total Geral das Vendas
+                              </Typography>
+                              <Typography variant="h4" sx={{ fontWeight: 'bold', mt: 1 }}>
+                                R$ {adminData.reduce((sum, d) => {
+                                  const t = d.transactions || {}
+                                  return sum + (t.pix || 0) + (t.cartao || 0) + (t.dinheiro || 0)
+                                }, 0).toFixed(2)}
+                              </Typography>
+                            </Paper>
+                          </Box>
+                        )}
+
+                        {/* User Cards */}
+                        <Grid container spacing={{ xs: 2, sm: 3 }} justifyContent="center">
+                          {['CAIXA_A', 'CAIXA_B', 'CAIXA_C'].map(userId => {
+                            const total = getTotalByUser(userId)
+                            const userData = getUserDetails(userId)
+                            return (
+                              <Grid item xs={12} sm={6} md={4} key={userId}>
+                                <Card
+                                  sx={{
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s',
+                                    '&:hover': {
+                                      transform: 'translateY(-4px)',
+                                      boxShadow: 6
+                                    },
+                                    background: 'linear-gradient(135deg, #8D6E63 0%, #6D4C41 100%)',
+                                    color: 'white',
+                                    border: userData && userData.fichas && userData.transactions ?
+                                      `4px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 100 ? '#ff0000' : 'transparent'}` : 'transparent',
+                                    boxShadow: userData && userData.fichas && userData.transactions ?
+                                      Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 100 ? '0 0 20px rgba(255, 0, 0, 0.5)' : 'none' : 'none',
+                                    '&:focus': {
+                                      outline: userData && userData.fichas && userData.transactions ?
+                                        `4px solid ${Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))) < 100 ? '#ff0000' : 'transparent'}` : 'transparent'
+                                    }
+                                  }}
+                                  onClick={() => {
+                                    const userSalesByDay = adminDataSinceBeginning
+                                      .filter(d => d.userId === userId)
+                                      .sort((a, b) => new Date(b.date) - new Date(a.date))
+                                    setSelectedDaySales(userSalesByDay)
+                                    setDaySalesDialogOpen(true)
+                                  }}
+                                >
+                                  <CardContent sx={{ textAlign: 'center', px: { xs: 2, sm: 3 } }}>
+                                    <Typography variant={{ xs: 'h5', sm: 'h4' }} gutterBottom>
+                                      {userId.replace('_', ' ')}
+                                    </Typography>
+                                    <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.3)' }} />
+                                    <Typography variant="body2" sx={{ mb: 1, opacity: 0.9 }}>
+                                      Total de Vendas
+                                    </Typography>
+                                    <Typography variant={{ xs: 'h4', sm: 'h3' }} sx={{ fontWeight: 'bold' }}>
+                                      R$ {total.toFixed(2)}
+                                    </Typography>
+                                    {userData && userData.transactions && (
+                                      <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5, opacity: 0.9 }}>
+                                        <Typography variant="caption">
+                                          Pix: R$ {(userData.transactions.pix || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption">
+                                          Cartão: R$ {(userData.transactions.cartao || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption">
+                                          Dinheiro: R$ {(userData.transactions.dinheiro || 0).toFixed(2)}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                    {userData && userData.fichas && (
+                                      <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5, opacity: 0.9 }}>
+                                        <Typography variant="caption">
+                                          Fichas Total: R$ {(userData.fichas || 0).toFixed(2)}
+                                        </Typography>
+                                        <Typography variant="caption">
+                                          Fichas Ainda No Caixa: R$ {Math.max(0, (userData.fichas || 0) - ((userData.transactions?.dinheiro || 0) + (userData.transactions?.cartao || 0) + (userData.transactions?.pix || 0))).toFixed(2)}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              </Grid>
+                            )
+                          })}
+                        </Grid>
+
+                        {/* Daily Sales List */}
+                        <Box sx={{ mt: 4 }}>
+                          <Typography variant="h6" gutterBottom>Vendas por Dia</Typography>
+                          {getUniqueDates().length === 0 ? (
+                            <Typography variant="body2" color="text.secondary">
+                              Nenhum dado disponível
+                            </Typography>
+                          ) : (
+                            <TableContainer component={Paper}>
+                              <Table>
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell>Data</TableCell>
+                                    <TableCell align="right">CAIXA A</TableCell>
+                                    <TableCell align="right">CAIXA B</TableCell>
+                                    <TableCell align="right">CAIXA C</TableCell>
+                                    <TableCell align="right">Total</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {getUniqueDates().map(date => {
+                                    const dayData = getDayData(date)
+                                    const totalA = getDayTotal(dayData, 'CAIXA_A')
+                                    const totalB = getDayTotal(dayData, 'CAIXA_B')
+                                    const totalC = getDayTotal(dayData, 'CAIXA_C')
+                                    const grandTotal = totalA + totalB + totalC
+                                    return (
+                                      <TableRow
+                                        key={date}
+                                        hover
+                                        sx={{ cursor: 'pointer' }}
+                                        onClick={() => {
+                                          setSelectedDaySales(dayData)
+                                          setDaySalesDialogOpen(true)
+                                        }}
+                                      >
+                                        <TableCell>
+                                          {date.split('-').reverse().join('/')}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {totalA > 0 ? `R$ ${totalA.toFixed(2)}` : '-'}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {totalB > 0 ? `R$ ${totalB.toFixed(2)}` : '-'}
+                                        </TableCell>
+                                        <TableCell align="right">
+                                          {totalC > 0 ? `R$ ${totalC.toFixed(2)}` : '-'}
+                                        </TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>
+                                          R$ {grandTotal.toFixed(2)}
+                                        </TableCell>
+                                      </TableRow>
+                                    )
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          )}
+                        </Box>
+                      </>
+                    )}
+                  </>
+                )}
+              </Paper>
+            </Grid>
+          </Grid>
+        </Container>
+
+        {/* Admin Password Dialog */}
+        <Dialog open={adminPasswordDialogOpen} onClose={() => setAdminPasswordDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LockIcon color="primary" />
+              Senha de Administrador
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <TextField
+              fullWidth
+              label="Senha"
+              type={showAdminPassword ? 'text' : 'password'}
+              value={adminPassword}
+              onChange={(e) => {
+                setAdminPassword(e.target.value)
+                setAdminPasswordError('')
+              }}
+              autoFocus
+              sx={{ mt: 2 }}
+              error={!!adminPasswordError}
+              helperText={adminPasswordError}
+              InputProps={{
+                endAdornment: (
+                  <IconButton onClick={() => setShowAdminPassword(!showAdminPassword)} edge="end">
+                    {showAdminPassword ? <VisibilityIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                )
+              }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setAdminPasswordDialogOpen(false)
+              setAdminPassword('')
+              setAdminPasswordError('')
+            }}>Cancelar</Button>
+            <Button
+              onClick={async () => {
+                if (!adminPassword.trim()) {
+                  setAdminPasswordError('Digite a senha')
+                  return
+                }
+
+                setAdminLoginLoading(true)
+                setAdminPasswordError('')
+
+                try {
+                  const fullPassword = `${adminPassword}-quermesse-santa-clara`
+                  const today = getDateGMT3()
+
+                  const response = await fetch(`${API_BASE_URL}/transactions?day=${today}`, {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-api-key': fullPassword
+                    }
+                  })
+
+                  if (response.ok) {
+                    const data = await response.json()
+                    setAdminData(data.data || [])
+                    setAdminAuthenticated(true)
+                    setAdminPasswordDialogOpen(false)
+                    setAdminPassword('')
+                    fetchAllAdminData()
+                  } else {
+                    setAdminPasswordError('Senha incorreta')
+                  }
+                } catch (error) {
+                  console.error('Error validating password:', error)
+                  setAdminPasswordError('Erro ao validar senha. Tente novamente.')
+                } finally {
+                  setAdminLoginLoading(false)
+                }
+              }}
+              variant="contained"
+              disabled={adminLoginLoading}
+            >
+              {adminLoginLoading ? 'Verificando...' : 'Entrar'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Day Sales Dialog */}
+        <Dialog open={daySalesDialogOpen} onClose={() => setDaySalesDialogOpen(false)} maxWidth="md" fullWidth>
+          <DialogTitle>
+            Vendas do Dia {selectedDaySales && selectedDaySales[0]?.date.split('-').reverse().join('/')}
+          </DialogTitle>
+          <DialogContent>
+            {selectedDaySales && selectedDaySales.length > 0 ? (
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Caixa</TableCell>
+                      <TableCell align="right">Pix</TableCell>
+                      <TableCell align="right">Cartão</TableCell>
+                      <TableCell align="right">Dinheiro</TableCell>
+                      <TableCell align="right">Total</TableCell>
+                      <TableCell align="right">Fichas</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {selectedDaySales.map((data) => (
+                      <TableRow key={data.userId}>
+                        <TableCell>{data.userId.replace('_', ' ')}</TableCell>
+                        <TableCell align="right">
+                          R$ {(data.transactions?.pix || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell align="right">
+                          R$ {(data.transactions?.cartao || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell align="right">
+                          R$ {(data.transactions?.dinheiro || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold' }}>
+                          R$ {((data.transactions?.pix || 0) + (data.transactions?.cartao || 0) + (data.transactions?.dinheiro || 0)).toFixed(2)}
+                        </TableCell>
+                        <TableCell align="right">
+                          R$ {(data.fichas || 0).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Typography>Nenhum dado disponível</Typography>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setDaySalesDialogOpen(false)
+              setSelectedDaySales(null)
+            }}>Fechar</Button>
+          </DialogActions>
+        </Dialog>
+      </div>
+    )
+  }
+
+  // Regular app with tabs
   return (
     <div className="app-container">
       <AppBar position="static" sx={{ background: 'linear-gradient(135deg, #5D4037 0%, #4A3728 100%)' }}>
@@ -1289,7 +1711,7 @@ function App() {
         <Paper sx={{ mb: 3 }}>
           <Tabs
             value={currentTab}
-            onChange={handleTabChange}
+            onChange={(_, newValue) => setCurrentTab(newValue)}
             centered
           >
             <Tab
@@ -1756,7 +2178,7 @@ function App() {
                   <Typography variant="h5">
                     Entradas e Saídas
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     <Button
                       variant="outlined"
                       startIcon={<AddIcon />}
@@ -1790,6 +2212,17 @@ function App() {
                       }}
                     >
                       Passagem/Saída Dinheiro
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="info"
+                      startIcon={<SwapHorizIcon />}
+                      onClick={() => {
+                        setExchangeFichaDialogOpen(true)
+                        setExchangeFichaAmount('')
+                      }}
+                    >
+                      Troca Ficha Por Dinheiro
                     </Button>
                   </Box>
                 </Box>
@@ -3010,6 +3443,45 @@ function App() {
             color={addRealMoneyType === 'deposit' ? 'success' : 'error'}
           >
             {addRealMoneyType === 'deposit' ? 'Registrar Entrada' : 'Registrar Saída'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Exchange Ficha por Dinheiro Dialog */}
+      <Dialog open={exchangeFichaDialogOpen} onClose={() => setExchangeFichaDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SwapHorizIcon color="info" />
+            Troca Ficha por Dinheiro
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Digite o valor para trocar fichas por dinheiro real. As fichas serão adicionadas e o dinheiro será sacado do caixa.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Valor"
+            type="number"
+            value={exchangeFichaAmount}
+            onChange={(e) => setExchangeFichaAmount(e.target.value)}
+            inputProps={{ step: '0.01', min: 0.01 }}
+            autoFocus
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setExchangeFichaDialogOpen(false)
+            setExchangeFichaAmount('')
+          }}>Cancelar</Button>
+          <Button
+            onClick={exchangeFichaForMoney}
+            variant="contained"
+            disabled={!exchangeFichaAmount || parseFloat(exchangeFichaAmount) <= 0}
+            color="info"
+          >
+            Realizar Troca
           </Button>
         </DialogActions>
       </Dialog>
