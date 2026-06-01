@@ -1380,9 +1380,8 @@ function App() {
                                     }
                                   }}
                                   onClick={() => {
-                                    const userSalesByDay = adminDataSinceBeginning
+                                    const userSalesByDay = adminData
                                       .filter(d => d.userId === userId)
-                                      .sort((a, b) => new Date(b.date) - new Date(a.date))
                                     setSelectedDaySales(userSalesByDay)
                                     setDaySalesDialogOpen(true)
                                   }}
@@ -2844,9 +2843,8 @@ function App() {
                                     }
                                   }}
                                   onClick={() => {
-                                    const userSalesByDay = adminDataSinceBeginning
+                                    const userSalesByDay = adminData
                                       .filter(d => d.userId === userId)
-                                      .sort((a, b) => new Date(b.date) - new Date(a.date))
                                     setSelectedDaySales(userSalesByDay)
                                     setDaySalesDialogOpen(true)
                                   }}
