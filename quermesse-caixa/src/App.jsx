@@ -1595,7 +1595,7 @@ function App() {
                       <TableCell align="right">Cartão</TableCell>
                       <TableCell align="right">Dinheiro</TableCell>
                       <TableCell align="right">Total</TableCell>
-                      <TableCell align="right">Fichas</TableCell>
+                      {/* <TableCell align="right">Fichas</TableCell> */}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1614,9 +1614,9 @@ function App() {
                         <TableCell align="right" sx={{ fontWeight: 'bold' }}>
                           R$ {((data.transactions?.pix || 0) + (data.transactions?.cartao || 0) + (data.transactions?.dinheiro || 0)).toFixed(2)}
                         </TableCell>
-                        <TableCell align="right">
+                        {/* <TableCell align="right">
                           R$ {(data.fichas || 0).toFixed(2)}
-                        </TableCell>
+                        </TableCell> */}
                       </TableRow>
                     ))}
                   </TableBody>
