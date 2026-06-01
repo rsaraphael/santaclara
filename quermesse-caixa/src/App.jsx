@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Container,
   Grid,
@@ -101,10 +102,16 @@ const formatGMT3DateTime = (isoString) => {
 }
 
 function App() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('Todos')
-  const [currentTab, setCurrentTab] = useState('caixa')
+  const [currentTab, setCurrentTab] = useState(() => {
+    // Initialize tab from URL
+    const path = location.pathname.replace('/', '') || 'caixa'
+    return ['caixa', 'historico', 'entradas', 'fichas', 'devolucao', 'admin'].includes(path) ? path : 'caixa'
+  })
   const [sales, setSales] = useState([])
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [confirmClearDialogOpen, setConfirmClearDialogOpen] = useState(false)
@@ -201,6 +208,20 @@ function App() {
       .then(data => setProducts(data))
       .catch(err => console.error('Erro ao carregar produtos:', err))
   }, [])
+
+  // Sync tab with URL
+  useEffect(() => {
+    const path = location.pathname.replace('/', '') || 'caixa'
+    if (['caixa', 'historico', 'entradas', 'fichas', 'devolucao', 'admin'].includes(path) && path !== currentTab) {
+      setCurrentTab(path)
+    }
+  }, [location.pathname])
+
+  // Update URL when tab changes
+  const handleTabChange = (_, newValue) => {
+    setCurrentTab(newValue)
+    navigate(newValue === 'caixa' ? '/' : `/${newValue}`)
+  }
 
   // Clear state if localStorage is empty (fresh start)
   useEffect(() => {
@@ -1268,7 +1289,7 @@ function App() {
         <Paper sx={{ mb: 3 }}>
           <Tabs
             value={currentTab}
-            onChange={(_, newValue) => setCurrentTab(newValue)}
+            onChange={handleTabChange}
             centered
           >
             <Tab
@@ -1320,7 +1341,7 @@ function App() {
                 </Box>
               }
             />
-            <Tab
+            {/* <Tab
               value="admin"
               label={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1328,7 +1349,7 @@ function App() {
                   Admin
                 </Box>
               }
-            />
+            /> */}
           </Tabs>
         </Paper>
 
@@ -2281,17 +2302,17 @@ function App() {
           /* Admin Panel */
           <Grid container spacing={3}>
             <Grid item xs={12}>
-              <Paper sx={{ p: 3 }}>
+              <Paper sx={{ p: { xs: 2, sm: 3 } }}>
                 <Typography variant="h5" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
                   <AdminIcon />
                   Painel Administrativo
                 </Typography>
 
                 {!adminAuthenticated ? (
-                  <Box sx={{ textAlign: 'center', py: 8 }}>
-                    <LockIcon sx={{ fontSize: 64, mb: 2, color: 'text.secondary' }} />
+                  <Box sx={{ textAlign: 'center', py: { xs: 4, sm: 8 } }}>
+                    <LockIcon sx={{ fontSize: { xs: 48, sm: 64 }, mb: 2, color: 'text.secondary' }} />
                     <Typography variant="h6" gutterBottom>Área Restrita</Typography>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                    <Typography variant="body2" color="text.secondary" gutterBottom sx={{ px: 2 }}>
                       Digite a senha de administrador para acessar
                     </Typography>
                     <Button
@@ -2311,7 +2332,7 @@ function App() {
                       </Box>
                     ) : (
                       <>
-                        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Typography variant="body2" color="text.secondary">
                               Dados de {getDateGMT3().split('-').reverse().join('/')}
@@ -2320,7 +2341,6 @@ function App() {
                               size="small"
                               variant="outlined"
                               onClick={() => {
-                                // Clear existing data and refetch everything
                                 fetchAdminData(getDateGMT3())
                                 fetchAllAdminData()
                               }}
@@ -2343,11 +2363,12 @@ function App() {
                         {adminData.length > 0 && (
                           <Box sx={{ mb: 4, textAlign: 'center' }}>
                             <Paper sx={{
-                              p: 3,
+                              p: { xs: 2, sm: 3 },
                               bgcolor: '#3E2723',
                               color: 'white',
                               display: 'inline-block',
-                              minWidth: 320,
+                              minWidth: { xs: '100%', sm: 320 },
+                              maxWidth: 400,
                               boxShadow: 4
                             }}>
                               <Typography variant="body2" sx={{ opacity: 0.9 }}>
@@ -2364,12 +2385,12 @@ function App() {
                         )}
 
                         {/* User Cards */}
-                        <Grid container spacing={3} justifyContent="center">
+                        <Grid container spacing={{ xs: 2, sm: 3 }} justifyContent="center">
                           {['CAIXA_A', 'CAIXA_B', 'CAIXA_C'].map(userId => {
                             const total = getTotalByUser(userId)
                             const userData = getUserDetails(userId)
                             return (
-                              <Grid item xs={12} sm={4} md={3} key={userId}>
+                              <Grid item xs={12} sm={6} md={4} key={userId}>
                                 <Card
                                   sx={{
                                     cursor: 'pointer',
@@ -2397,15 +2418,15 @@ function App() {
                                     setDaySalesDialogOpen(true)
                                   }}
                                 >
-                                  <CardContent sx={{ textAlign: 'center' }}>
-                                    <Typography variant="h4" gutterBottom>
+                                  <CardContent sx={{ textAlign: 'center', px: { xs: 2, sm: 3 } }}>
+                                    <Typography variant={{ xs: 'h5', sm: 'h4' }} gutterBottom>
                                       {userId.replace('_', ' ')}
                                     </Typography>
                                     <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.3)' }} />
                                     <Typography variant="body2" sx={{ mb: 1, opacity: 0.9 }}>
                                       Total de Vendas
                                     </Typography>
-                                    <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
+                                    <Typography variant={{ xs: 'h4', sm: 'h3' }} sx={{ fontWeight: 'bold' }}>
                                       R$ {total.toFixed(2)}
                                     </Typography>
                                     {userData && userData.transactions && (
