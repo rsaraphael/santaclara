@@ -657,7 +657,7 @@ function App() {
       const newTransactions = [...transactions, transaction]
       saveTransactionsToStorage(newTransactions)
 
-      setAddFichaQuantities({ 1: '', 2: '', 5: '', 10: '', 20: '' })
+      setAddFichaQuantities({ 1: '', 2: '', 3: '', 5: '', 10: '', 20: '' })
       setAddFichaDialogOpen(false)
     }
   }
@@ -2183,7 +2183,7 @@ function App() {
                       startIcon={<AddIcon />}
                       onClick={() => {
                         setAddFichaDialogOpen(true)
-                        setAddFichaQuantities({ 1: '', 2: '', 5: '', 10: '', 20: '' })
+                        setAddFichaQuantities({ 1: '', 2: '', 3: '', 5: '', 10: '', 20: '' })
                       }}
                     >
                       Adicionar Fichas
@@ -3366,9 +3366,25 @@ function App() {
       {/* Add Ficha Dialog */}
       <Dialog open={addFichaDialogOpen} onClose={() => setAddFichaDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AddIcon color="primary" />
-            Adicionar Fichas
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AddIcon color="primary" />
+              Adicionar Fichas
+            </Box>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                const quantities = {}
+                DENOMINATIONS.forEach(d => {
+                  const currentVal = parseInt(addFichaQuantities[d]) || 0
+                  quantities[d] = String(currentVal + 100)
+                })
+                setAddFichaQuantities(quantities)
+              }}
+            >
+              +100 de cada
+            </Button>
           </Box>
         </DialogTitle>
         <DialogContent>
@@ -3397,7 +3413,7 @@ function App() {
         <DialogActions>
           <Button onClick={() => {
             setAddFichaDialogOpen(false)
-            setAddFichaQuantities({ 1: '', 2: '', 5: '', 10: '', 20: '' })
+            setAddFichaQuantities({ 1: '', 2: '', 3: '', 5: '', 10: '', 20: '' })
           }}>Cancelar</Button>
           <Button
             onClick={addFichaFromTransaction}
